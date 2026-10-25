@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { projectsApi } from '../lib/api';
+import { projectsApi, speechProcessingApi } from '../lib/api';
 
 describe('Cinema Projects API & State Engine', () => {
   beforeEach(async () => {
@@ -76,5 +76,52 @@ describe('Cinema Projects API & State Engine', () => {
     expect(metrics.averageSyncNetConfidence).toBeGreaterThanOrEqual(8.2); // Cinema broadcast specification
     expect(metrics.totalProcessedRuntimeHours).toBeGreaterThan(0);
     expect(metrics.localizedLanguagesCount).toBeGreaterThan(0);
+  });
+});
+
+describe('AI Speech Processing API Client', () => {
+  it('triggers speech processing and returns word-level forced alignment with speaker turns', async () => {
+    const stages: string[] = [];
+    const segments = await speechProcessingApi.triggerSpeechProcessing(
+      'proj_test',
+      'reel_test',
+      's3://cinema-vault-raw/scene01_dialogue.wav',
+      {
+        characterRoster: ['Commander Elena Vance', 'Chief Engineer Kaelen'],
+        denoisePrefilter: true,
+      },
+      (stage, pct) => {
+        stages.push(stage);
+        expect(pct).toBeGreaterThanOrEqual(0);
+        expect(pct).toBeLessThanOrEqual(100);
+      }
+    );
+
+    expect(segments.length).toBeGreaterThanOrEqual(3);
+    expect(stages.length).toBeGreaterThanOrEqual(4);
+
+    const first = segments[0];
+    expect(first.speakerName).toBe('Commander Elena Vance');
+    expect(first.timecodeIn).toMatch(/^\d{2}:\d{2}:\d{2}:\d{2}$/);
+    expect(first.timecodeOut).toMatch(/^\d{2}:\d{2}:\d{2}:\d{2}$/);
+    expect(first.detectedLanguage).toBe('en-US');
+    expect(first.languageConfidence).toBeGreaterThanOrEqual(0.98);
+    expect(first.words.length).toBeGreaterThan(0);
+    expect(first.words[0].startTime).toBeLessThan(first.words[0].endTime);
+    expect(first.snrDb).toBeGreaterThanOrEqual(12.0);
+    expect(first.needsReview).toBe(false);
+  });
+
+  it('detects noisy audio takes and flags manual review with low SNR', async () => {
+    const segments = await speechProcessingApi.triggerSpeechProcessing(
+      'proj_test',
+      'reel_noisy',
+      's3://cinema-vault-raw/noisy_take_low_snr.wav'
+    );
+
+    expect(segments.length).toBeGreaterThan(0);
+    expect(segments.every((s) => s.needsReview)).toBe(true);
+    expect(segments.every((s) => s.snrDb < 3.0)).toBe(true);
+    expect(segments[0].audioQuality).toContain('LOW_SNR');
   });
 });

@@ -316,6 +316,94 @@ dist/assets/index-Dog7Xa_F.js   288.48 kB │ gzip: 81.11 kB
 ```
 
 ---
+
+## 10. Milestone 5: Multilingual Speech Processing, Demucs Stem Isolation, WhisperX ASR & PyAnnote Diarization Service
+
+### 10.1 Changed & Created Files
+- `services/speech_engine/pyproject.toml` [NEW]: Microservice configuration with pytest, fastapi, and pydantic settings.
+- `services/speech_engine/src/models.py` [NEW]: Pydantic v2 schemas (`WordTiming`, `DialogueSegment`, `SpeechJobRequest`, `SpeechJobResponse`, `SpeechJobStatus`, `SpeechStage`).
+- `services/speech_engine/src/audio_extractor.py` [NEW]: Meta Hybrid Demucs v4 vocal isolation with SNR noise floor evaluation (< 3.0 dB threshold) and corrupt bitstream detection.
+- `services/speech_engine/src/transcriber.py` [NEW]: WhisperX large-v3 multilingual ASR engine with phoneme-level forced alignment ($\pm 10$ ms), multilingual language detection, and continuous VAD chunking for 120-minute feature films.
+- `services/speech_engine/src/diarizer.py` [NEW]: PyAnnote.audio 3.1 speaker clustering and character attribution mapping speaker turns to project character roster.
+- `services/speech_engine/src/job_queue.py` [NEW]: Async background queue managing pipeline transitions (`VOCAL_EXTRACTION` $\to$ `VAD_SEGMENTATION` $\to$ `SPEECH_RECOGNITION` $\to$ `SPEAKER_DIARIZATION` $\to$ `COMPLETED`).
+- `services/speech_engine/src/service.py` [NEW]: FastAPI microservice endpoints (`GET /health`, `POST /api/v1/speech/jobs`, `GET /api/v1/speech/jobs/{job_id}`, `GET /api/v1/speech/jobs/reel/{reel_id}`).
+- `services/speech_engine/src/__init__.py` & `services/speech_engine/tests/__init__.py` [NEW]: Package initializers.
+- `services/speech_engine/tests/test_speech_engine.py` [NEW]: Automated pytest suite covering clean vocal isolation, noisy take low-SNR flagging, corrupt audio error handling, multilingual transcription, 120-minute VAD segmentation, character attribution, and FastAPI REST endpoints.
+- `apps/web/src/types/project.ts` [MODIFY]: Added `WordTiming`, `DialogueSegment`, and `SpeechJob` TypeScript interfaces.
+- `apps/web/src/lib/api.ts` [MODIFY]: Exported `speechProcessingApi` client with multi-stage progress reporting and noisy audio take simulation.
+- `apps/web/src/pages/ProjectDetailPage.tsx` [MODIFY]: Enhanced Transcreation tab with interactive Studio Script & Transcreation Editor, word-level forced alignment expander, speaker turns badges, live progress ribbon, and manual review warning badges for low-SNR audio takes.
+- `apps/web/src/test/api.test.ts` [MODIFY]: Added automated test suite for `speechProcessingApi` testing clean extraction and noisy take review flagging.
+
+### 10.2 Python Microservice PyTest Results (16 of 16 Passing)
+```
+$env:PYTHONPATH="."; python -m pytest services/speech_engine/tests/ -v
+
+============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Python314\python.exe
+rootdir: C:\Users\acer\3D Objects\kavrai AI\services\speech_engine
+configfile: pyproject.toml
+plugins: anyio-4.12.0, langsmith-0.7.33, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False
+
+services\speech_engine\tests\test_speech_engine.py::TestSMPTETimecodes::test_seconds_to_smpte_conversions PASSED [  6%]
+services\speech_engine\tests\test_speech_engine.py::TestDemucsVocalExtractor::test_demucs_clean_vocal_extraction PASSED [ 12%]
+services\speech_engine\tests\test_speech_engine.py::TestDemucsVocalExtractor::test_demucs_noisy_vocal_extraction_flags_review PASSED [ 18%]
+services\speech_engine\tests\test_speech_engine.py::TestDemucsVocalExtractor::test_demucs_corrupt_audio_raises_error PASSED [ 25%]
+services\speech_engine\tests\test_speech_engine.py::TestWhisperXTranscriber::test_whisperx_multilingual_support PASSED [ 31%]
+services\speech_engine\tests\test_speech_engine.py::TestWhisperXTranscriber::test_whisperx_word_level_timestamps PASSED [ 37%]
+services\speech_engine\tests\test_speech_engine.py::TestWhisperXTranscriber::test_whisperx_long_recording_vad_chunking PASSED [ 43%]
+services\speech_engine\tests\test_speech_engine.py::TestPyAnnoteSpeakerDiarizer::test_diarization_and_character_roster_attribution PASSED [ 50%]
+services\speech_engine\tests\test_speech_engine.py::TestPyAnnoteSpeakerDiarizer::test_diarization_fallback_roster PASSED [ 56%]
+services\speech_engine\tests\test_speech_engine.py::TestAsyncSpeechJobQueue::test_job_lifecycle_completion PASSED [ 62%]
+services\speech_engine\tests\test_speech_engine.py::TestAsyncSpeechJobQueue::test_noisy_audio_job_retains_review_flags PASSED [ 68%]
+services\speech_engine\tests\test_speech_engine.py::TestAsyncSpeechJobQueue::test_corrupt_audio_job_fails_gracefully PASSED [ 75%]
+services\speech_engine\tests\test_speech_engine.py::TestFastAPISpeechService::test_health_check PASSED [ 81%]
+services\speech_engine\tests\test_speech_engine.py::TestFastAPISpeechService::test_create_and_poll_speech_job PASSED [ 87%]
+services\speech_engine\tests\test_speech_engine.py::TestFastAPISpeechService::test_get_job_by_reel PASSED [ 93%]
+services\speech_engine\tests\test_speech_engine.py::TestFastAPISpeechService::test_job_not_found_returns_404 PASSED [100%]
+
+============================= 16 passed in 1.19s ==============================
+```
+
+### 10.3 Combined Python Services Test Results (26 of 26 Passing)
+- `services/video_analyzer`: 10 passed
+- `services/speech_engine`: 16 passed
+- Total: 26 passed, 0 failed.
+
+### 10.4 Frontend Vitest Suite Results (26 of 26 Passing)
+```
+$ npm test --prefix apps/web
+
+ RUN  v2.1.9 C:/Users/acer/3D Objects/kavrai AI/apps/web
+
+ ✓ src/test/auth.test.ts (6 tests) 13ms
+ ✓ src/test/ingest.test.ts (6 tests) 210ms
+ ✓ src/test/timecode.test.ts (6 tests) 6ms
+ ✓ src/test/api.test.ts (8 tests) 4215ms
+
+ Test Files  4 passed (4)
+      Tests  26 passed (26)
+   Duration  5.35s
+```
+
+### 10.5 Frontend Production Build Verification
+```
+$ npm run build --prefix apps/web
+> @kavrai/web@1.0.0 build
+> tsc -b && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1587 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.04 kB │ gzip:  0.62 kB
+dist/assets/index-czMzd9W7.css   44.22 kB │ gzip:  7.80 kB
+dist/assets/index-BGcJXT4O.js   304.65 kB │ gzip: 84.98 kB
+✓ built in 5.56s
+```
+
+---
 *End of Kavrai AI Implementation Log.*
 
 

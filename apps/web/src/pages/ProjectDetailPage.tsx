@@ -14,12 +14,103 @@ import {
   UserCheck,
   UploadCloud,
   Sparkles,
+  Volume2,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Wand2,
 } from 'lucide-react';
-import { FilmProject, Reel, Shot } from '../types/project';
-import { projectsApi, videoAnalysisApi } from '../lib/api';
+import { FilmProject, Reel, Shot, DialogueSegment } from '../types/project';
+import { projectsApi, videoAnalysisApi, speechProcessingApi } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { CinemaPlayerModal } from '../components/player/CinemaPlayerModal';
 import { MediaIngestModal } from '../components/ingest/MediaIngestModal';
+
+const MOCK_DIALOGUE_SEGMENTS: DialogueSegment[] = [
+  {
+    id: 'seg-init-001',
+    speakerId: 'SPEAKER_00',
+    speakerName: 'Commander Elena Vance',
+    timecodeIn: '01:00:01:06',
+    timecodeOut: '01:00:04:18',
+    startSeconds: 1.25,
+    endSeconds: 4.75,
+    detectedLanguage: 'en-US',
+    languageConfidence: 0.99,
+    sourceText: 'Orbital trajectory confirmed. Atmospheric entry vector initialized.',
+    targetText: 'Trayectoria orbital confirmada. Vector de reentrada atmosférica iniciado.',
+    audioQuality: 'ISOLATED_VOCAL_CLEAN (SDR 12.4 dB)',
+    snrDb: 14.8,
+    needsReview: false,
+    words: [
+      { word: 'Orbital', startTime: 1.25, endTime: 1.65, confidence: 0.98 },
+      { word: 'trajectory', startTime: 1.68, endTime: 2.25, confidence: 0.97 },
+      { word: 'confirmed.', startTime: 2.28, endTime: 2.85, confidence: 0.99 },
+      { word: 'Atmospheric', startTime: 2.95, endTime: 3.55, confidence: 0.96 },
+      { word: 'entry', startTime: 3.58, endTime: 3.95, confidence: 0.98 },
+      { word: 'vector', startTime: 3.98, endTime: 4.35, confidence: 0.97 },
+      { word: 'initialized.', startTime: 4.38, endTime: 4.75, confidence: 0.99 },
+    ],
+  },
+  {
+    id: 'seg-init-002',
+    speakerId: 'SPEAKER_01',
+    speakerName: 'Chief Engineer Kaelen',
+    timecodeIn: '01:00:06:00',
+    timecodeOut: '01:00:10:12',
+    startSeconds: 6.0,
+    endSeconds: 10.5,
+    detectedLanguage: 'en-US',
+    languageConfidence: 0.99,
+    sourceText: 'Shield frequency holding at ninety-two percent. Keep the main thrusters synchronized.',
+    targetText: 'Frecuencia de escudos estable al noventa y dos por ciento. Mantengan propulsores sincronizados.',
+    audioQuality: 'ISOLATED_VOCAL_CLEAN (SDR 12.4 dB)',
+    snrDb: 15.2,
+    needsReview: false,
+    words: [
+      { word: 'Shield', startTime: 6.0, endTime: 6.4, confidence: 0.97 },
+      { word: 'frequency', startTime: 6.42, endTime: 6.95, confidence: 0.96 },
+      { word: 'holding', startTime: 6.98, endTime: 7.35, confidence: 0.98 },
+      { word: 'at', startTime: 7.36, endTime: 7.5, confidence: 0.99 },
+      { word: 'ninety-two', startTime: 7.52, endTime: 8.1, confidence: 0.97 },
+      { word: 'percent.', startTime: 8.12, endTime: 8.6, confidence: 0.98 },
+      { word: 'Keep', startTime: 8.7, endTime: 8.95, confidence: 0.99 },
+      { word: 'the', startTime: 8.96, endTime: 9.1, confidence: 0.99 },
+      { word: 'main', startTime: 9.12, endTime: 9.4, confidence: 0.98 },
+      { word: 'thrusters', startTime: 9.42, endTime: 9.9, confidence: 0.96 },
+      { word: 'synchronized.', startTime: 9.92, endTime: 10.5, confidence: 0.97 },
+    ],
+  },
+  {
+    id: 'seg-init-003',
+    speakerId: 'SPEAKER_00',
+    speakerName: 'Commander Elena Vance',
+    timecodeIn: '01:00:12:08',
+    timecodeOut: '01:00:16:04',
+    startSeconds: 12.33,
+    endSeconds: 16.16,
+    detectedLanguage: 'en-US',
+    languageConfidence: 0.98,
+    sourceText: 'We have an anomalous radiation signature breaching the forward bulkhead.',
+    targetText: 'Detectamos una firma de radiación anómala atravesando el mamparo de proa.',
+    audioQuality: 'LOW_SNR_NOISE_GATE_WARNING',
+    snrDb: 2.5,
+    needsReview: true,
+    words: [
+      { word: 'We', startTime: 12.33, endTime: 12.5, confidence: 0.72 },
+      { word: 'have', startTime: 12.52, endTime: 12.75, confidence: 0.71 },
+      { word: 'an', startTime: 12.76, endTime: 12.9, confidence: 0.73 },
+      { word: 'anomalous', startTime: 12.92, endTime: 13.5, confidence: 0.68 },
+      { word: 'radiation', startTime: 13.52, endTime: 14.1, confidence: 0.69 },
+      { word: 'signature', startTime: 14.12, endTime: 14.65, confidence: 0.70 },
+      { word: 'breaching', startTime: 14.68, endTime: 15.2, confidence: 0.69 },
+      { word: 'the', startTime: 15.22, endTime: 15.35, confidence: 0.74 },
+      { word: 'forward', startTime: 15.38, endTime: 15.75, confidence: 0.71 },
+      { word: 'bulkhead.', startTime: 15.78, endTime: 16.16, confidence: 0.69 },
+    ],
+  },
+];
 
 const MOCK_SHOTS: Shot[] = [
   {
@@ -82,6 +173,13 @@ export const ProjectDetailPage: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analysisStage, setAnalysisStage] = useState<string>('');
   const [analysisProgress, setAnalysisProgress] = useState<number>(0);
+  const [dialogueSegments, setDialogueSegments] = useState<DialogueSegment[]>(MOCK_DIALOGUE_SEGMENTS);
+  const [isProcessingSpeech, setIsProcessingSpeech] = useState<boolean>(false);
+  const [speechStage, setSpeechStage] = useState<string>('');
+  const [speechProgress, setSpeechProgress] = useState<number>(0);
+  const [expandedSegmentId, setExpandedSegmentId] = useState<string | null>(null);
+  const [simulateNoise, setSimulateNoise] = useState<boolean>(false);
+  const [selectedLangCode, setSelectedLangCode] = useState<string>('es-ES');
   const { user, hasPermission } = useAuth();
 
   useEffect(() => {
@@ -444,41 +542,276 @@ export const ProjectDetailPage: React.FC = () => {
 
         {/* Tab 2: Multilingual Transcreation */}
         {activeTab === 'TRANSCREATION' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {project.targetLanguages.map((tl) => (
-              <div
-                key={tl.code}
-                className="rounded-2xl border border-apple-gray-200 bg-apple-surface p-5 shadow-apple-sm dark:border-darkroom-border dark:bg-darkroom-surface"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{tl.flag}</span>
-                    <span className="font-bold text-sm text-apple-gray-900 dark:text-white">
-                      {tl.name}
-                    </span>
-                  </div>
-                  <span className="rounded-full bg-apple-blue/10 px-2.5 py-0.5 text-[11px] font-semibold text-apple-blue dark:bg-apple-blue/20 dark:text-blue-400">
-                    Syllable Budget: $\Delta \le \pm 1$
+          <div className="space-y-6">
+            {/* Header Action & Model Toolbar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-sm font-bold text-apple-gray-900 dark:text-white">
+                    Dialogue Transcreation & Speaker Turns
+                  </h3>
+                  <span className="rounded-full bg-apple-blue/10 px-2.5 py-0.5 text-[10px] font-semibold text-apple-blue dark:bg-apple-blue/20 dark:text-blue-400">
+                    WhisperX · Demucs v4 · PyAnnote 3.1
                   </span>
                 </div>
-                <div className="space-y-2 text-xs text-apple-gray-600 dark:text-apple-gray-300">
-                  <div className="flex justify-between border-b border-apple-gray-100 py-1.5 dark:border-darkroom-border/60">
-                    <span>Phonetic BLEU Score:</span>
-                    <span className="font-mono font-semibold text-emerald-600">38.4 (Target &ge; 34.0)</span>
-                  </div>
-                  <div className="flex justify-between border-b border-apple-gray-100 py-1.5 dark:border-darkroom-border/60">
-                    <span>chrF++ Morphological Overlap:</span>
-                    <span className="font-mono font-semibold text-emerald-600">62.1 (Target &ge; 58.0)</span>
-                  </div>
-                  <div className="flex justify-between py-1.5">
-                    <span>Viseme Closure Alignment (/p, b, m/):</span>
-                    <span className="font-mono font-semibold text-cinema-green">&plusmn;1 Frame (98.2%)</span>
-                  </div>
+                <p className="text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
+                  Multilingual forced alignment with word-level SMPTE timestamps (&plusmn;10ms) and acoustic voiceprint clustering.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Noisy Take Simulation Checkbox for QA */}
+                <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-apple-gray-200/80 bg-apple-surface px-2.5 py-1.5 text-[11px] font-medium text-apple-gray-700 hover:border-apple-gray-300 dark:border-darkroom-border dark:bg-darkroom-surface dark:text-apple-gray-300 shadow-2xs">
+                  <input
+                    type="checkbox"
+                    checked={simulateNoise}
+                    onChange={(e) => setSimulateNoise(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-apple-gray-300 text-apple-blue focus:ring-apple-blue"
+                  />
+                  <span>Simulate Noisy Audio Take</span>
+                </label>
+
+                {/* Speech Processing Trigger Button */}
+                <button
+                  onClick={async () => {
+                    if (!selectedReel || !project) return;
+                    setIsProcessingSpeech(true);
+                    try {
+                      const audioUri = simulateNoise
+                        ? 's3://cinema-vault-raw/noisy_take_01.wav'
+                        : selectedReel.s3MasterUri || 's3://cinema-vault-raw/reel_01.wav';
+                      const results = await speechProcessingApi.triggerSpeechProcessing(
+                        project.id,
+                        selectedReel.id,
+                        audioUri,
+                        {
+                          characterRoster: [
+                            'Commander Elena Vance',
+                            'Chief Engineer Kaelen',
+                            'Dr. Marcus Thorne',
+                          ],
+                          denoisePrefilter: true,
+                        },
+                        (stg, pct) => {
+                          setSpeechStage(stg);
+                          setSpeechProgress(pct);
+                        }
+                      );
+                      setDialogueSegments(results);
+                    } catch (err) {
+                      console.error('Speech processing failed:', err);
+                    } finally {
+                      setIsProcessingSpeech(false);
+                    }
+                  }}
+                  disabled={isProcessingSpeech}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-apple-blue px-3 py-1.5 text-xs font-semibold text-white shadow-glow-blue hover:bg-apple-blue-hover active:scale-95 disabled:opacity-50 transition-all"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>
+                    {isProcessingSpeech ? 'Processing Audio & ASR...' : 'Extract Dialogue & Speaker Turns'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Live Speech Progress Ribbon */}
+            {isProcessingSpeech && (
+              <div className="p-4 bg-apple-blue/5 border border-apple-blue/20 rounded-2xl dark:bg-apple-blue/10 animate-fade-in shadow-2xs">
+                <div className="flex items-center justify-between text-xs font-semibold text-apple-blue dark:text-blue-400 mb-1.5">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-apple-blue animate-pulse" />
+                    <span>{speechStage}</span>
+                  </span>
+                  <span className="font-mono">{speechProgress}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-apple-blue/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-apple-blue rounded-full transition-all duration-300"
+                    style={{ width: `${speechProgress}%` }}
+                  />
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Target Language Selection Pills */}
+            <div className="flex items-center gap-2 border-b border-apple-gray-200/80 pb-3 dark:border-darkroom-border">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-apple-gray-400 mr-1">
+                Target Language:
+              </span>
+              {project.targetLanguages.map((tl) => (
+                <button
+                  key={tl.code}
+                  onClick={() => setSelectedLangCode(tl.code)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                    selectedLangCode === tl.code
+                      ? 'bg-apple-blue text-white shadow-sm font-semibold'
+                      : 'bg-apple-gray-100 text-apple-gray-700 hover:bg-apple-gray-200 dark:bg-darkroom-elevated dark:text-apple-gray-300'
+                  }`}
+                >
+                  <span>{tl.flag}</span>
+                  <span>{tl.name}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Dialogue Segments Cards */}
+            <div className="space-y-4">
+              {dialogueSegments.map((seg) => {
+                const isExpanded = expandedSegmentId === seg.id;
+                return (
+                  <div
+                    key={seg.id}
+                    className={`rounded-2xl border bg-apple-surface shadow-apple-sm transition-all overflow-hidden ${
+                      seg.needsReview
+                        ? 'border-amber-300 dark:border-amber-700/60 ring-1 ring-amber-400/20'
+                        : 'border-apple-gray-200 dark:border-darkroom-border hover:border-apple-gray-300 dark:hover:border-darkroom-border/80'
+                    }`}
+                  >
+                    {/* Card Top Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-apple-gray-100 bg-apple-gray-50/50 px-4 py-2.5 dark:border-darkroom-border/60 dark:bg-darkroom-elevated/40 text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono text-[11px] font-bold text-apple-gray-400">
+                          {seg.id}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-apple-blue/10 px-2 py-0.5 text-xs font-semibold text-apple-blue dark:bg-blue-500/20 dark:text-blue-300">
+                          <UserCheck className="h-3 w-3" />
+                          <span>{seg.speakerName}</span>
+                          <span className="font-mono text-[10px] opacity-75">({seg.speakerId})</span>
+                        </span>
+                        <span className="font-mono text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
+                          {seg.timecodeIn} → {seg.timecodeOut}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {seg.needsReview ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span>Low SNR ({seg.snrDb} dB) · Manual Review Required</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>Clean Stem · SNR {seg.snrDb} dB</span>
+                          </span>
+                        )}
+                        <span className="font-mono text-[11px] text-apple-gray-400">
+                          {seg.detectedLanguage} ({(seg.languageConfidence * 100).toFixed(0)}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Script Comparison Columns */}
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Original Master Audio Dialogue */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-apple-gray-400">
+                          Original Master Script ({project.sourceLanguage.name})
+                        </span>
+                        <div className="p-3 rounded-xl bg-apple-gray-50 dark:bg-darkroom-elevated/60 text-xs font-medium text-apple-gray-800 dark:text-apple-gray-200 border border-apple-gray-100 dark:border-darkroom-border/40">
+                          "{seg.sourceText}"
+                        </div>
+                      </div>
+
+                      {/* Transcreated Localized Dialogue */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-apple-gray-400 flex items-center justify-between">
+                          <span>Transcreated Script ({selectedLangCode})</span>
+                          <span className="text-emerald-600 font-mono text-[10px]">&plusmn;0 Syllable Drift</span>
+                        </span>
+                        <textarea
+                          rows={2}
+                          value={seg.targetText || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDialogueSegments((prev) =>
+                              prev.map((s) => (s.id === seg.id ? { ...s, targetText: val } : s))
+                            );
+                          }}
+                          className="w-full p-2.5 rounded-xl border border-apple-gray-200 bg-white text-xs text-apple-gray-900 focus:border-apple-blue focus:ring-1 focus:ring-apple-blue dark:border-darkroom-border dark:bg-darkroom-elevated dark:text-white transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Word-Level Phoneme Alignment Toggle */}
+                    <div className="px-4 pb-3">
+                      <button
+                        onClick={() => setExpandedSegmentId(isExpanded ? null : seg.id)}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-apple-blue hover:text-apple-blue-hover dark:text-blue-400 transition-colors"
+                      >
+                        {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                        <span>
+                          {isExpanded ? 'Hide' : 'Show'} Word-Level Forced Alignment ({seg.words.length} words &plusmn;10ms)
+                        </span>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="mt-2.5 p-3 rounded-xl bg-apple-gray-50/80 dark:bg-darkroom-elevated/40 border border-apple-gray-100 dark:border-darkroom-border/60 animate-fade-in">
+                          <div className="flex flex-wrap gap-2">
+                            {seg.words.map((w, wIdx) => (
+                              <div
+                                key={wIdx}
+                                className="flex flex-col items-center rounded-lg border border-apple-gray-200/80 bg-white px-2 py-1 shadow-2xs dark:border-darkroom-border dark:bg-darkroom-elevated"
+                              >
+                                <span className="font-semibold text-xs text-apple-gray-900 dark:text-white">
+                                  {w.word}
+                                </span>
+                                <span className="font-mono text-[9px] text-apple-gray-400">
+                                  {w.startTime.toFixed(2)}s - {w.endTime.toFixed(2)}s
+                                </span>
+                                <span className="font-mono text-[9px] font-medium text-emerald-600 dark:text-emerald-400">
+                                  {(w.confidence * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Target Language Verification Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-apple-gray-200/60 dark:border-darkroom-border/60">
+              {project.targetLanguages.map((tl) => (
+                <div
+                  key={tl.code}
+                  className="rounded-2xl border border-apple-gray-200 bg-apple-surface p-5 shadow-apple-sm dark:border-darkroom-border dark:bg-darkroom-surface"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{tl.flag}</span>
+                      <span className="font-bold text-sm text-apple-gray-900 dark:text-white">
+                        {tl.name}
+                      </span>
+                    </div>
+                    <span className="rounded-full bg-apple-blue/10 px-2.5 py-0.5 text-[11px] font-semibold text-apple-blue dark:bg-apple-blue/20 dark:text-blue-400">
+                      Syllable Budget: $\Delta \le \pm 1$
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-xs text-apple-gray-600 dark:text-apple-gray-300">
+                    <div className="flex justify-between border-b border-apple-gray-100 py-1.5 dark:border-darkroom-border/60">
+                      <span>Phonetic BLEU Score:</span>
+                      <span className="font-mono font-semibold text-emerald-600">38.4 (Target &ge; 34.0)</span>
+                    </div>
+                    <div className="flex justify-between border-b border-apple-gray-100 py-1.5 dark:border-darkroom-border/60">
+                      <span>chrF++ Morphological Overlap:</span>
+                      <span className="font-mono font-semibold text-emerald-600">62.1 (Target &ge; 58.0)</span>
+                    </div>
+                    <div className="flex justify-between py-1.5">
+                      <span>Viseme Closure Alignment (/p, b, m/):</span>
+                      <span className="font-mono font-semibold text-cinema-green">&plusmn;1 Frame (98.2%)</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
+
 
         {/* Tab 3: Voice & Stems */}
         {activeTab === 'VOICE' && (

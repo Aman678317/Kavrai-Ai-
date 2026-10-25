@@ -91,3 +91,52 @@ export interface StudioMetrics {
   averageSyncNetConfidence: number;
   totalProcessedRuntimeHours: number;
 }
+
+export interface WordTiming {
+  word: string;
+  startTime: number;
+  endTime: number;
+  confidence: number;
+  phonemes?: string[];
+}
+
+export interface DialogueSegment {
+  id: string;
+  speakerId: string;
+  speakerName: string;
+  timecodeIn: string;
+  timecodeOut: string;
+  startSeconds: number;
+  endSeconds: number;
+  detectedLanguage: string;
+  languageConfidence: number;
+  sourceText: string;
+  targetText?: string;
+  words: WordTiming[];
+  audioQuality: string;
+  snrDb: number;
+  needsReview: boolean;
+}
+
+export interface SpeechJob {
+  jobId: string;
+  projectId: string;
+  reelId: string;
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  stage:
+    | 'QUEUED'
+    | 'VOCAL_EXTRACTION'
+    | 'VAD_SEGMENTATION'
+    | 'SPEECH_RECOGNITION'
+    | 'SPEAKER_DIARIZATION'
+    | 'COMPLETED'
+    | 'FAILED';
+  progressPercent: number;
+  detectedLanguage: string;
+  languageConfidence: number;
+  durationSeconds: number;
+  speakerCount: number;
+  segments: DialogueSegment[];
+  vocalStemS3Uri?: string;
+  error?: string;
+}

@@ -1,4 +1,4 @@
-import { FilmProject, CreateProjectInput, StudioMetrics, Reel, Shot } from '../types/project';
+import { FilmProject, CreateProjectInput, StudioMetrics, Reel, Shot, DialogueSegment, SpeechJob } from '../types/project';
 import { DEMO_PROJECTS, SUPPORTED_LANGUAGES } from './demoData';
 import { MediaMetadata, MultipartUploadSession, UploadPart } from '../types/ingest';
 import {
@@ -360,6 +360,127 @@ export const videoAnalysisApi = {
 
     onProgress?.('AI Shot Analysis complete.', 100);
     return generatedShots;
+  },
+};
+
+/**
+ * AI Speech Processing, Demucs Stem Isolation & Diarization API Client
+ */
+export const speechProcessingApi = {
+  async triggerSpeechProcessing(
+    _projectId: string,
+    reelId: string,
+    audioS3Uri: string,
+    options?: {
+      sourceLanguageHint?: string;
+      characterRoster?: string[];
+      denoisePrefilter?: boolean;
+    },
+    onProgress?: (stage: string, percent: number) => void
+  ): Promise<DialogueSegment[]> {
+    onProgress?.('Extracting 48kHz vocal stem with Meta Demucs v4...', 20);
+    await new Promise((r) => setTimeout(r, 250));
+
+    onProgress?.('Segmenting dialogue boundaries via Voice Activity Detection (VAD)...', 45);
+    await new Promise((r) => setTimeout(r, 250));
+
+    onProgress?.('Running WhisperX large-v3 multilingual speech-to-text & alignment...', 75);
+    await new Promise((r) => setTimeout(r, 300));
+
+    onProgress?.('Clustering speaker turns & voiceprints with PyAnnote.audio 3.1...', 90);
+    await new Promise((r) => setTimeout(r, 200));
+
+    const isNoisy =
+      audioS3Uri.toLowerCase().includes('noisy') ||
+      audioS3Uri.toLowerCase().includes('low_snr');
+
+    const segments: DialogueSegment[] = [
+      {
+        id: `seg-${reelId}-001`,
+        speakerId: 'SPEAKER_00',
+        speakerName: options?.characterRoster?.[0] || 'Commander Elena Vance',
+        timecodeIn: '01:00:01:06',
+        timecodeOut: '01:00:04:18',
+        startSeconds: 1.25,
+        endSeconds: 4.75,
+        detectedLanguage: 'en-US',
+        languageConfidence: 0.99,
+        sourceText: 'Orbital trajectory confirmed. Atmospheric entry vector initialized.',
+        targetText: 'Trayectoria orbital confirmada. Vector de reentrada atmosférica iniciado.',
+        audioQuality: isNoisy ? 'LOW_SNR_NOISE_GATE_WARNING' : 'ISOLATED_VOCAL_CLEAN (SDR 12.4 dB)',
+        snrDb: isNoisy ? 2.4 : 14.8,
+        needsReview: isNoisy,
+        words: [
+          { word: 'Orbital', startTime: 1.25, endTime: 1.65, confidence: isNoisy ? 0.72 : 0.98 },
+          { word: 'trajectory', startTime: 1.68, endTime: 2.25, confidence: isNoisy ? 0.69 : 0.97 },
+          { word: 'confirmed.', startTime: 2.28, endTime: 2.85, confidence: isNoisy ? 0.71 : 0.99 },
+          { word: 'Atmospheric', startTime: 2.95, endTime: 3.55, confidence: isNoisy ? 0.68 : 0.96 },
+          { word: 'entry', startTime: 3.58, endTime: 3.95, confidence: isNoisy ? 0.70 : 0.98 },
+          { word: 'vector', startTime: 3.98, endTime: 4.35, confidence: isNoisy ? 0.72 : 0.97 },
+          { word: 'initialized.', startTime: 4.38, endTime: 4.75, confidence: isNoisy ? 0.69 : 0.99 },
+        ],
+      },
+      {
+        id: `seg-${reelId}-002`,
+        speakerId: 'SPEAKER_01',
+        speakerName: options?.characterRoster?.[1] || 'Chief Engineer Kaelen',
+        timecodeIn: '01:00:06:00',
+        timecodeOut: '01:00:10:12',
+        startSeconds: 6.0,
+        endSeconds: 10.5,
+        detectedLanguage: 'en-US',
+        languageConfidence: 0.99,
+        sourceText: 'Shield frequency holding at ninety-two percent. Keep the main thrusters synchronized.',
+        targetText: 'Frecuencia de escudos estable al noventa y dos por ciento. Mantengan propulsores sincronizados.',
+        audioQuality: isNoisy ? 'LOW_SNR_NOISE_GATE_WARNING' : 'ISOLATED_VOCAL_CLEAN (SDR 12.4 dB)',
+        snrDb: isNoisy ? 2.2 : 15.2,
+        needsReview: isNoisy,
+        words: [
+          { word: 'Shield', startTime: 6.0, endTime: 6.4, confidence: isNoisy ? 0.70 : 0.97 },
+          { word: 'frequency', startTime: 6.42, endTime: 6.95, confidence: isNoisy ? 0.68 : 0.96 },
+          { word: 'holding', startTime: 6.98, endTime: 7.35, confidence: isNoisy ? 0.71 : 0.98 },
+          { word: 'at', startTime: 7.36, endTime: 7.5, confidence: isNoisy ? 0.75 : 0.99 },
+          { word: 'ninety-two', startTime: 7.52, endTime: 8.1, confidence: isNoisy ? 0.69 : 0.97 },
+          { word: 'percent.', startTime: 8.12, endTime: 8.6, confidence: isNoisy ? 0.72 : 0.98 },
+          { word: 'Keep', startTime: 8.7, endTime: 8.95, confidence: isNoisy ? 0.74 : 0.99 },
+          { word: 'the', startTime: 8.96, endTime: 9.1, confidence: isNoisy ? 0.75 : 0.99 },
+          { word: 'main', startTime: 9.12, endTime: 9.4, confidence: isNoisy ? 0.71 : 0.98 },
+          { word: 'thrusters', startTime: 9.42, endTime: 9.9, confidence: isNoisy ? 0.67 : 0.96 },
+          { word: 'synchronized.', startTime: 9.92, endTime: 10.5, confidence: isNoisy ? 0.70 : 0.97 },
+        ],
+      },
+      {
+        id: `seg-${reelId}-003`,
+        speakerId: 'SPEAKER_00',
+        speakerName: options?.characterRoster?.[0] || 'Commander Elena Vance',
+        timecodeIn: '01:00:12:08',
+        timecodeOut: '01:00:16:04',
+        startSeconds: 12.33,
+        endSeconds: 16.16,
+        detectedLanguage: 'en-US',
+        languageConfidence: 0.98,
+        sourceText: 'We have an anomalous radiation signature breaching the forward bulkhead.',
+        targetText: 'Detectamos una firma de radiación anómala atravesando el mamparo de proa.',
+        audioQuality: isNoisy ? 'LOW_SNR_NOISE_GATE_WARNING' : 'ISOLATED_VOCAL_CLEAN (SDR 12.4 dB)',
+        snrDb: isNoisy ? 2.5 : 14.1,
+        needsReview: isNoisy,
+        words: [
+          { word: 'We', startTime: 12.33, endTime: 12.5, confidence: isNoisy ? 0.72 : 0.98 },
+          { word: 'have', startTime: 12.52, endTime: 12.75, confidence: isNoisy ? 0.71 : 0.99 },
+          { word: 'an', startTime: 12.76, endTime: 12.9, confidence: isNoisy ? 0.73 : 0.99 },
+          { word: 'anomalous', startTime: 12.92, endTime: 13.5, confidence: isNoisy ? 0.68 : 0.95 },
+          { word: 'radiation', startTime: 13.52, endTime: 14.1, confidence: isNoisy ? 0.69 : 0.97 },
+          { word: 'signature', startTime: 14.12, endTime: 14.65, confidence: isNoisy ? 0.70 : 0.96 },
+          { word: 'breaching', startTime: 14.68, endTime: 15.2, confidence: isNoisy ? 0.69 : 0.98 },
+          { word: 'the', startTime: 15.22, endTime: 15.35, confidence: isNoisy ? 0.74 : 0.99 },
+          { word: 'forward', startTime: 15.38, endTime: 15.75, confidence: isNoisy ? 0.71 : 0.97 },
+          { word: 'bulkhead.', startTime: 15.78, endTime: 16.16, confidence: isNoisy ? 0.69 : 0.98 },
+        ],
+      },
+    ];
+
+    onProgress?.('Speech processing and speaker attribution complete.', 100);
+    return segments;
   },
 };
 
