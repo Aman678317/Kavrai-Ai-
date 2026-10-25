@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { FilmProject, Reel, Shot } from '../types/project';
 import { projectsApi } from '../lib/api';
+import { CinemaPlayerModal } from '../components/player/CinemaPlayerModal';
 
 const MOCK_SHOTS: Shot[] = [
   {
@@ -66,6 +67,7 @@ export const ProjectDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'REELS' | 'TRANSCREATION' | 'VOICE' | 'DELIVERY'>('REELS');
   const [selectedReel, setSelectedReel] = useState<Reel | null>(null);
+  const [isPlayerOpen, setIsPlayerOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const loadProject = async () => {
@@ -194,7 +196,7 @@ export const ProjectDetailPage: React.FC = () => {
             {/* Quick Actions & Launch A/B Player */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <button
-                onClick={() => alert(`Launching A/B Dual Cinema Player for "${project.title}"...`)}
+                onClick={() => setIsPlayerOpen(true)}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-apple-blue px-4 py-2.5 text-xs font-semibold text-white shadow-glow-blue hover:bg-apple-blue-hover active:scale-[0.98] transition-all"
               >
                 <Play className="h-4 w-4 fill-white" />
@@ -438,6 +440,15 @@ export const ProjectDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Theatrical Dual-Viewport Cinema Player Modal */}
+      {project && (
+        <CinemaPlayerModal
+          project={project}
+          isOpen={isPlayerOpen}
+          onClose={() => setIsPlayerOpen(false)}
+        />
+      )}
     </div>
   );
 };

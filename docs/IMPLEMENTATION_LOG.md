@@ -99,4 +99,49 @@ dist/assets/index-C9traKNH.js   229.99 kB │ gzip: 67.60 kB
 - [x] Production bundle builds with `tsc -b && vite build`.
 
 ---
-*End of Milestone 1 Implementation Log.*
+
+## 6. Theatrical Dual-Viewport A/B Cinema Player & Multi-Track Timeline
+
+### 6.1 Architectural Inventory
+| File Path | Component / Feature |
+| :--- | :--- |
+| `apps/web/src/lib/timecode.ts` | SMPTE timecode frame math, conversions (`HH:MM:SS:FF`), and duration formatters. |
+| `apps/web/src/components/player/SplitWipeViewer.tsx` | Dual-viewport video preview with draggable vertical split slider (`clipPath: inset(0 0 0 ${pos}%)`), View Modes (`SPLIT`, `ORIGINAL`, `LOCALIZED`), and frame zoom. |
+| `apps/web/src/components/player/TimelineScrubber.tsx` | Multi-track timeline scrubber with dynamic audio waveform bars, shot cut markers, hover timecodes, and draggable playhead. |
+| `apps/web/src/components/player/CinemaPlayerModal.tsx` | Fullscreen theatrical Darkroom modal with J-K-L playback, single-frame stepping (`←` / `→`), speed switching (0.5x - 2.0x), and audio controls. |
+| `apps/web/src/pages/ProjectDetailPage.tsx` | Integrated "Launch A/B Split-Wipe Player" button opening the player modal for active project. |
+| `apps/web/src/test/timecode.test.ts` | Unit tests for SMPTE timecode conversions and duration formatting. |
+
+### 6.2 Test Results (All 12 Tests Passing)
+```
+> @kavrai/web@1.0.0 test
+> vitest run
+
+ RUN  v2.1.9 C:/Users/acer/3D Objects/kavrai AI/apps/web
+
+ ✓ src/test/timecode.test.ts (6 tests) 8ms
+ ✓ src/test/api.test.ts (6 tests) 2195ms
+
+ Test Files  2 passed (2)
+      Tests  12 passed (12)
+   Duration  3.28s
+```
+
+### 6.3 Production Build Verification
+```
+> @kavrai/web@1.0.0 build
+> tsc -b && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1581 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.04 kB │ gzip:  0.62 kB
+dist/assets/index-C3ZtievC.css   37.68 kB │ gzip:  6.93 kB
+dist/assets/index-TQnb6ewI.js   245.71 kB │ gzip: 71.02 kB
+✓ built in 6.24s
+```
+
+---
+*End of Kavrai AI Implementation Log.*
