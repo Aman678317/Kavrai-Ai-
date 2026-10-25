@@ -20,12 +20,153 @@ import {
   ChevronDown,
   ChevronUp,
   Wand2,
+  BookOpen,
+  CheckCheck,
+  RefreshCw,
+  AlertOctagon,
+  MessageSquare,
 } from 'lucide-react';
-import { FilmProject, Reel, Shot, DialogueSegment } from '../types/project';
-import { projectsApi, videoAnalysisApi, speechProcessingApi } from '../lib/api';
+import {
+  FilmProject,
+  Reel,
+  Shot,
+  DialogueSegment,
+  DubbingScriptLine,
+  ToneProfile,
+  ValidationStatus,
+} from '../types/project';
+import {
+  projectsApi,
+  videoAnalysisApi,
+  speechProcessingApi,
+  transcreationApi,
+} from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { CinemaPlayerModal } from '../components/player/CinemaPlayerModal';
 import { MediaIngestModal } from '../components/ingest/MediaIngestModal';
+
+const MOCK_DUBBING_LINES: DubbingScriptLine[] = [
+  {
+    id: 'dub-init-001',
+    shotId: 'shot-101',
+    timecodeIn: '01:00:01:06',
+    timecodeOut: '01:00:04:18',
+    startSeconds: 1.25,
+    endSeconds: 4.75,
+    characterId: 'char_elena',
+    characterName: 'Commander Elena Vance',
+    characterRelationship: 'Commanding lead pilot directing operations',
+    sceneContext: 'Deep space command bridge during atmospheric entry descent',
+    tone: 'URGENT_COMMAND',
+    sourceLanguage: 'en-US',
+    targetLanguage: 'es-ES',
+    sourceText: 'Orbital trajectory confirmed. Atmospheric entry vector initialized.',
+    translatedText: 'Trayectoria orbital lista. Vector de reentrada iniciado.',
+    sourceSyllables: 21,
+    targetSyllables: 20,
+    syllableDelta: 1,
+    durationDeltaPercent: -4.8,
+    validationStatus: 'VALIDATED',
+    isApproved: true,
+    culturalNotes: 'Preserved formal military aerospace protocol.',
+    visemeAnchors: [
+      { viseme: 'bilabial', targetFrame: 34, phoneme: 'b', isClosure: true },
+      { viseme: 'bilabial', targetFrame: 78, phoneme: 'p', isClosure: true },
+    ],
+    pronunciationNotes: [
+      {
+        word: 'Trayectoria',
+        ipa: '[tɾa.ʝekˈto.ɾja]',
+        phoneticSpelling: 'trah-yek-TOH-ryah',
+        stressSyllable: 'TOH',
+      },
+      {
+        word: 'reentrada',
+        ipa: '[re.enˈtɾa.ða]',
+        phoneticSpelling: 'reh-en-TRAH-thah',
+        stressSyllable: 'TRAH',
+      },
+    ],
+  },
+  {
+    id: 'dub-init-002',
+    shotId: 'shot-102',
+    timecodeIn: '01:00:06:00',
+    timecodeOut: '01:00:10:12',
+    startSeconds: 6.0,
+    endSeconds: 10.5,
+    characterId: 'char_kaelen',
+    characterName: 'Chief Engineer Kaelen',
+    characterRelationship: 'Senior propulsion engineer reporting to Commander Vance',
+    sceneContext: 'Engineering deck adjusting ion engine coils under heat load',
+    tone: 'URGENT_COMMAND',
+    sourceLanguage: 'en-US',
+    targetLanguage: 'es-ES',
+    sourceText: 'Shield frequency holding at ninety-two percent. Keep the main thrusters synchronized.',
+    translatedText: 'Escudos al noventa y dos por ciento. Propulsores sincronizados.',
+    sourceSyllables: 21,
+    targetSyllables: 21,
+    syllableDelta: 0,
+    durationDeltaPercent: 0.0,
+    validationStatus: 'VALIDATED',
+    isApproved: true,
+    culturalNotes: 'Precise technical cadence with zero syllable drift.',
+    visemeAnchors: [
+      { viseme: 'bilabial', targetFrame: 154, phoneme: 'p', isClosure: true },
+      { viseme: 'bilabial', targetFrame: 210, phoneme: 'm', isClosure: true },
+    ],
+    pronunciationNotes: [
+      {
+        word: 'propulsores',
+        ipa: '[pɾo.pulˈso.ɾes]',
+        phoneticSpelling: 'pro-pool-SOH-res',
+        stressSyllable: 'SOH',
+      },
+    ],
+  },
+  {
+    id: 'dub-init-003',
+    shotId: 'shot-103',
+    timecodeIn: '01:00:12:08',
+    timecodeOut: '01:00:16:04',
+    startSeconds: 12.33,
+    endSeconds: 16.16,
+    characterId: 'char_elena',
+    characterName: 'Commander Elena Vance',
+    characterRelationship: 'Reporting emergency warning status to cockpit crew',
+    sceneContext: 'Hull sensor panel flashing red warning indicators',
+    tone: 'URGENT_COMMAND',
+    sourceLanguage: 'en-US',
+    targetLanguage: 'es-ES',
+    sourceText: 'We have an anomalous radiation signature breaching the forward bulkhead.',
+    translatedText: 'Firma anómala de radiación que cruza el mamparo de proa.',
+    sourceSyllables: 20,
+    targetSyllables: 20,
+    syllableDelta: 0,
+    durationDeltaPercent: 0.0,
+    validationStatus: 'VALIDATED',
+    isApproved: true,
+    culturalNotes: 'Tense cinematic pacing with bilabial anchor on /m/ (mamparo).',
+    visemeAnchors: [
+      { viseme: 'bilabial', targetFrame: 312, phoneme: 'm', isClosure: true },
+      { viseme: 'bilabial', targetFrame: 345, phoneme: 'p', isClosure: true },
+    ],
+    pronunciationNotes: [
+      {
+        word: 'radiación',
+        ipa: '[ra.ðjaˈsjon]',
+        phoneticSpelling: 'rah-thyah-SYOHN',
+        stressSyllable: 'SYOHN',
+      },
+      {
+        word: 'mamparo',
+        ipa: '[mamˈpa.ɾo]',
+        phoneticSpelling: 'mahm-PAH-ro',
+        stressSyllable: 'PAH',
+      },
+    ],
+  },
+];
 
 const MOCK_DIALOGUE_SEGMENTS: DialogueSegment[] = [
   {
@@ -180,6 +321,15 @@ export const ProjectDetailPage: React.FC = () => {
   const [expandedSegmentId, setExpandedSegmentId] = useState<string | null>(null);
   const [simulateNoise, setSimulateNoise] = useState<boolean>(false);
   const [selectedLangCode, setSelectedLangCode] = useState<string>('es-ES');
+  const [dubbingLines, setDubbingLines] = useState<DubbingScriptLine[]>(MOCK_DUBBING_LINES);
+  const [transcreationView, setTranscreationView] = useState<'DUBBING_SCRIPT' | 'SPEECH_ASR'>('DUBBING_SCRIPT');
+  const [isTranscreating, setIsTranscreating] = useState<boolean>(false);
+  const [transcreationStage, setTranscreationStage] = useState<string>('');
+  const [transcreationProgress, setTranscreationProgress] = useState<number>(0);
+  const [expandedDubLineId, setExpandedDubLineId] = useState<string | null>(null);
+  const [simulateProviderFailure, setSimulateProviderFailure] = useState<boolean>(false);
+  const [simulateProviderRetry, setSimulateProviderRetry] = useState<boolean>(false);
+  const [transcreationNotification, setTranscreationNotification] = useState<string | null>(null);
   const { user, hasPermission } = useAuth();
 
   useEffect(() => {
@@ -543,236 +693,535 @@ export const ProjectDetailPage: React.FC = () => {
         {/* Tab 2: Multilingual Transcreation */}
         {activeTab === 'TRANSCREATION' && (
           <div className="space-y-6">
-            {/* Header Action & Model Toolbar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-sm font-bold text-apple-gray-900 dark:text-white">
-                    Dialogue Transcreation & Speaker Turns
-                  </h3>
-                  <span className="rounded-full bg-apple-blue/10 px-2.5 py-0.5 text-[10px] font-semibold text-apple-blue dark:bg-apple-blue/20 dark:text-blue-400">
-                    WhisperX · Demucs v4 · PyAnnote 3.1
-                  </span>
-                </div>
-                <p className="text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
-                  Multilingual forced alignment with word-level SMPTE timestamps (&plusmn;10ms) and acoustic voiceprint clustering.
-                </p>
+            {/* View Switcher: Dubbing Scripts vs ASR Transcription */}
+            <div className="flex items-center justify-between border-b border-apple-gray-200/80 pb-3 dark:border-darkroom-border">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setTranscreationView('DUBBING_SCRIPT')}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                    transcreationView === 'DUBBING_SCRIPT'
+                      ? 'bg-apple-blue text-white shadow-glow-blue'
+                      : 'bg-apple-gray-100 text-apple-gray-700 hover:bg-apple-gray-200 dark:bg-darkroom-elevated dark:text-apple-gray-300'
+                  }`}
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Theatrical Dubbing Scripts & Syllable Timing</span>
+                </button>
+                <button
+                  onClick={() => setTranscreationView('SPEECH_ASR')}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                    transcreationView === 'SPEECH_ASR'
+                      ? 'bg-apple-blue text-white shadow-glow-blue'
+                      : 'bg-apple-gray-100 text-apple-gray-700 hover:bg-apple-gray-200 dark:bg-darkroom-elevated dark:text-apple-gray-300'
+                  }`}
+                >
+                  <Mic2 className="h-3.5 w-3.5" />
+                  <span>Speech ASR & Phoneme Alignment</span>
+                </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                {/* Noisy Take Simulation Checkbox for QA */}
-                <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-apple-gray-200/80 bg-apple-surface px-2.5 py-1.5 text-[11px] font-medium text-apple-gray-700 hover:border-apple-gray-300 dark:border-darkroom-border dark:bg-darkroom-surface dark:text-apple-gray-300 shadow-2xs">
-                  <input
-                    type="checkbox"
-                    checked={simulateNoise}
-                    onChange={(e) => setSimulateNoise(e.target.checked)}
-                    className="h-3.5 w-3.5 rounded border-apple-gray-300 text-apple-blue focus:ring-apple-blue"
-                  />
-                  <span>Simulate Noisy Audio Take</span>
-                </label>
-
-                {/* Speech Processing Trigger Button */}
-                <button
-                  onClick={async () => {
-                    if (!selectedReel || !project) return;
-                    setIsProcessingSpeech(true);
-                    try {
-                      const audioUri = simulateNoise
-                        ? 's3://cinema-vault-raw/noisy_take_01.wav'
-                        : selectedReel.s3MasterUri || 's3://cinema-vault-raw/reel_01.wav';
-                      const results = await speechProcessingApi.triggerSpeechProcessing(
-                        project.id,
-                        selectedReel.id,
-                        audioUri,
-                        {
-                          characterRoster: [
-                            'Commander Elena Vance',
-                            'Chief Engineer Kaelen',
-                            'Dr. Marcus Thorne',
-                          ],
-                          denoisePrefilter: true,
-                        },
-                        (stg, pct) => {
-                          setSpeechStage(stg);
-                          setSpeechProgress(pct);
-                        }
-                      );
-                      setDialogueSegments(results);
-                    } catch (err) {
-                      console.error('Speech processing failed:', err);
-                    } finally {
-                      setIsProcessingSpeech(false);
-                    }
-                  }}
-                  disabled={isProcessingSpeech}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-apple-blue px-3 py-1.5 text-xs font-semibold text-white shadow-glow-blue hover:bg-apple-blue-hover active:scale-95 disabled:opacity-50 transition-all"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>
-                    {isProcessingSpeech ? 'Processing Audio & ASR...' : 'Extract Dialogue & Speaker Turns'}
-                  </span>
-                </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono text-apple-gray-400">
+                  Target: {selectedLangCode} · Syllable Delta &le; &plusmn;1
+                </span>
               </div>
             </div>
 
-            {/* Live Speech Progress Ribbon */}
-            {isProcessingSpeech && (
-              <div className="p-4 bg-apple-blue/5 border border-apple-blue/20 rounded-2xl dark:bg-apple-blue/10 animate-fade-in shadow-2xs">
-                <div className="flex items-center justify-between text-xs font-semibold text-apple-blue dark:text-blue-400 mb-1.5">
-                  <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-apple-blue animate-pulse" />
-                    <span>{speechStage}</span>
-                  </span>
-                  <span className="font-mono">{speechProgress}%</span>
+            {/* Subview 1: Theatrical Dubbing Script Editor (Claude 3.5 Sonnet / Qwen-2.5-72B) */}
+            {transcreationView === 'DUBBING_SCRIPT' && (
+              <div className="space-y-6">
+                {/* Header Action & Model Toolbar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-sm font-bold text-apple-gray-900 dark:text-white">
+                        Syllable-Constrained Dubbing Scripts
+                      </h3>
+                      <span className="rounded-full bg-apple-blue/10 px-2.5 py-0.5 text-[10px] font-semibold text-apple-blue dark:bg-apple-blue/20 dark:text-blue-400">
+                        Claude 3.5 Sonnet · Qwen-2.5-72B · Syllable Budgeting
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
+                      Context-aware theatrical dialogue adaptation with character relationship dynamics, pronunciation guides (IPA), and bilabial viseme alignment (/p, b, m/).
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Retry on 429 Rate Limit Simulation */}
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-apple-gray-200/80 bg-apple-surface px-2.5 py-1.5 text-[11px] font-medium text-apple-gray-700 hover:border-apple-gray-300 dark:border-darkroom-border dark:bg-darkroom-surface dark:text-apple-gray-300 shadow-2xs">
+                      <input
+                        type="checkbox"
+                        checked={simulateProviderRetry}
+                        onChange={(e) => setSimulateProviderRetry(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-apple-gray-300 text-apple-blue focus:ring-apple-blue"
+                      />
+                      <span>Simulate 429 Retry Recovery</span>
+                    </label>
+
+                    {/* Provider 500 Failure Simulation */}
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-apple-gray-200/80 bg-apple-surface px-2.5 py-1.5 text-[11px] font-medium text-apple-gray-700 hover:border-apple-gray-300 dark:border-darkroom-border dark:bg-darkroom-surface dark:text-apple-gray-300 shadow-2xs">
+                      <input
+                        type="checkbox"
+                        checked={simulateProviderFailure}
+                        onChange={(e) => setSimulateProviderFailure(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-apple-gray-300 text-apple-blue focus:ring-apple-blue"
+                      />
+                      <span>Simulate 500 Provider Failure</span>
+                    </label>
+
+                    {/* Transcreation Trigger Button */}
+                    <button
+                      onClick={async () => {
+                        if (!selectedReel || !project) return;
+                        setIsTranscreating(true);
+                        setTranscreationNotification(null);
+                        try {
+                          const result = await transcreationApi.triggerTranscreation(
+                            project.id,
+                            selectedReel.id,
+                            selectedLangCode,
+                            {
+                              syllableBudgetTolerance: 1,
+                              simulateFailure: simulateProviderFailure,
+                              simulateRateLimit: simulateProviderRetry,
+                            },
+                            (stg, pct) => {
+                              setTranscreationStage(stg);
+                              setTranscreationProgress(pct);
+                            }
+                          );
+                          setDubbingLines(result.lines);
+                          if (result.retryCount > 0) {
+                            setTranscreationNotification(
+                              `Provider rate limit encountered. Recovered automatically via exponential backoff (Retry attempt 1 succeeded).`
+                            );
+                          }
+                        } catch (err: any) {
+                          setTranscreationNotification(`Transcreation Error: ${err.message || 'Provider failure'}`);
+                        } finally {
+                          setIsTranscreating(false);
+                        }
+                      }}
+                      disabled={isTranscreating}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-apple-blue px-3 py-1.5 text-xs font-semibold text-white shadow-glow-blue hover:bg-apple-blue-hover active:scale-95 disabled:opacity-50 transition-all"
+                    >
+                      <Wand2 className="h-3.5 w-3.5" />
+                      <span>{isTranscreating ? 'Transcreating Dialogue...' : 'Generate AI Dubbing Script'}</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="h-1.5 w-full bg-apple-blue/20 rounded-full overflow-hidden">
+
+                {/* Live Progress Ribbon */}
+                {isTranscreating && (
+                  <div className="p-4 bg-apple-blue/5 border border-apple-blue/20 rounded-2xl dark:bg-apple-blue/10 animate-fade-in shadow-2xs">
+                    <div className="flex items-center justify-between text-xs font-semibold text-apple-blue dark:text-blue-400 mb-1.5">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-apple-blue animate-pulse" />
+                        <span>{transcreationStage}</span>
+                      </span>
+                      <span className="font-mono">{transcreationProgress}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-apple-blue/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-apple-blue rounded-full transition-all duration-300"
+                        style={{ width: `${transcreationProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Retry or Failure Notification Banner */}
+                {transcreationNotification && (
                   <div
-                    className="h-full bg-apple-blue rounded-full transition-all duration-300"
-                    style={{ width: `${speechProgress}%` }}
-                  />
+                    className={`p-3.5 rounded-2xl border text-xs flex items-center justify-between animate-fade-in ${
+                      transcreationNotification.includes('Error')
+                        ? 'bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/30 dark:border-rose-900/40 dark:text-rose-300'
+                        : 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900/40 dark:text-emerald-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {transcreationNotification.includes('Error') ? (
+                        <AlertOctagon className="h-4 w-4 shrink-0 text-rose-600" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 shrink-0 text-emerald-600 animate-spin-slow" />
+                      )}
+                      <span>{transcreationNotification}</span>
+                    </div>
+                    <button
+                      onClick={() => setTranscreationNotification(null)}
+                      className="text-[11px] underline opacity-80 hover:opacity-100"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+
+                {/* Target Language Selection Tabs */}
+                <div className="flex items-center justify-between border-b border-apple-gray-200/80 pb-3 dark:border-darkroom-border">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-apple-gray-400 mr-1">
+                      Localization Target:
+                    </span>
+                    {project.targetLanguages.map((tl) => (
+                      <button
+                        key={tl.code}
+                        onClick={() => setSelectedLangCode(tl.code)}
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                          selectedLangCode === tl.code
+                            ? 'bg-apple-blue text-white shadow-sm font-semibold'
+                            : 'bg-apple-gray-100 text-apple-gray-700 hover:bg-apple-gray-200 dark:bg-darkroom-elevated dark:text-apple-gray-300'
+                        }`}
+                      >
+                        <span>{tl.flag}</span>
+                        <span>{tl.name}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Summary Metric Chips */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="rounded-md bg-apple-gray-100 dark:bg-darkroom-elevated px-2 py-0.5 font-mono text-[11px] text-apple-gray-600 dark:text-apple-gray-300">
+                      {dubbingLines.length} Dub Lines
+                    </span>
+                    <span className="rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 font-mono text-[11px] font-semibold border border-emerald-200/60">
+                      {dubbingLines.filter((l) => l.isApproved).length} Approved
+                    </span>
+                    <span className="rounded-md bg-apple-blue/10 text-apple-blue dark:bg-apple-blue/20 dark:text-blue-300 px-2 py-0.5 font-mono text-[11px] font-semibold">
+                      Avg &Delta;: &le; &plusmn;1 Syllable
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dubbing Script Lines List */}
+                <div className="space-y-4">
+                  {dubbingLines.map((line) => {
+                    const isExpanded = expandedDubLineId === line.id;
+                    const deltaColor =
+                      line.syllableDelta === 0
+                        ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400'
+                        : line.syllableDelta <= 1
+                        ? 'text-apple-blue bg-apple-blue/10 dark:bg-apple-blue/20 dark:text-blue-400'
+                        : 'text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400';
+
+                    return (
+                      <div
+                        key={line.id}
+                        className={`rounded-2xl border bg-apple-surface shadow-apple-sm transition-all overflow-hidden ${
+                          line.isApproved
+                            ? 'border-apple-gray-200 dark:border-darkroom-border hover:border-apple-gray-300'
+                            : 'border-amber-300 dark:border-amber-700/60 ring-1 ring-amber-400/20'
+                        }`}
+                      >
+                        {/* Line Top Bar */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-apple-gray-100 bg-apple-gray-50/50 px-4 py-2.5 dark:border-darkroom-border/60 dark:bg-darkroom-elevated/40 text-xs">
+                          <div className="flex items-center gap-2.5">
+                            <span className="font-mono text-[11px] font-bold text-apple-gray-400">
+                              {line.id}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-apple-blue/10 px-2 py-0.5 text-xs font-semibold text-apple-blue dark:bg-blue-500/20 dark:text-blue-300">
+                              <UserCheck className="h-3 w-3" />
+                              <span>{line.characterName}</span>
+                            </span>
+                            <span className="font-mono text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
+                              {line.timecodeIn} &rarr; {line.timecodeOut}
+                            </span>
+                            <span className="hidden sm:inline-block text-[11px] text-apple-gray-400 italic truncate max-w-xs">
+                              {line.characterRelationship}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* Dramatic Tone Badge */}
+                            <span className="rounded-md bg-cinema-purple/10 text-cinema-purple border border-cinema-purple/20 dark:bg-purple-500/20 dark:text-purple-300 px-2 py-0.5 text-[10px] font-semibold">
+                              {line.tone.replace('_', ' ')}
+                            </span>
+
+                            {/* Validation Status Badge */}
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border ${
+                                line.isApproved
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+                                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30'
+                              }`}
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              <span>{line.validationStatus}</span>
+                            </span>
+
+                            {/* Approval Toggle */}
+                            <button
+                              onClick={() => {
+                                setDubbingLines((prev) =>
+                                  prev.map((l) =>
+                                    l.id === line.id
+                                      ? {
+                                          ...l,
+                                          isApproved: !l.isApproved,
+                                          validationStatus: !l.isApproved ? 'VALIDATED' : 'MANUALLY_EDITED',
+                                        }
+                                      : l
+                                  )
+                                );
+                              }}
+                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-medium transition-all ${
+                                line.isApproved
+                                  ? 'bg-apple-gray-100 text-apple-gray-600 hover:bg-apple-gray-200 dark:bg-darkroom-elevated dark:text-apple-gray-300'
+                                  : 'bg-emerald-600 text-white shadow-2xs hover:bg-emerald-700'
+                              }`}
+                            >
+                              <CheckCheck className="h-3 w-3" />
+                              <span>{line.isApproved ? 'Locked' : 'Approve'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Script Comparison & Syllable Counter Grid */}
+                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Original Script */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-apple-gray-400">
+                              <span>Original English ({project.sourceLanguage.name})</span>
+                              <span className="font-mono text-apple-gray-500 font-semibold">
+                                {line.sourceSyllables} Syllables
+                              </span>
+                            </div>
+                            <div className="p-3 rounded-xl bg-apple-gray-50 dark:bg-darkroom-elevated/60 text-xs font-medium text-apple-gray-800 dark:text-apple-gray-200 border border-apple-gray-100 dark:border-darkroom-border/40">
+                              "{line.sourceText}"
+                            </div>
+                          </div>
+
+                          {/* Transcreated Dubbing Script */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-apple-gray-400">
+                              <span>Transcreated Dubbing Script ({selectedLangCode})</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-apple-gray-500 font-semibold">
+                                  {line.targetSyllables} Syllables
+                                </span>
+                                <span className={`font-mono text-[10px] font-bold px-1.5 py-0.2 rounded ${deltaColor}`}>
+                                  &Delta; {line.syllableDelta === 0 ? '0' : `&plusmn;${line.syllableDelta}`}
+                                </span>
+                              </div>
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={line.translatedText}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setDubbingLines((prev) =>
+                                  prev.map((l) =>
+                                    l.id === line.id
+                                      ? {
+                                          ...l,
+                                          translatedText: val,
+                                          validationStatus: 'MANUALLY_EDITED',
+                                        }
+                                      : l
+                                  )
+                                );
+                              }}
+                              className="w-full p-2.5 rounded-xl border border-apple-gray-200 bg-white text-xs text-apple-gray-900 focus:border-apple-blue focus:ring-1 focus:ring-apple-blue dark:border-darkroom-border dark:bg-darkroom-elevated dark:text-white transition-colors"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Pronunciation & Viseme Drawer Toggle */}
+                        <div className="px-4 pb-3">
+                          <button
+                            onClick={() => setExpandedDubLineId(isExpanded ? null : line.id)}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-apple-blue hover:text-apple-blue-hover dark:text-blue-400 transition-colors"
+                          >
+                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            <span>
+                              {isExpanded ? 'Hide' : 'Show'} Voice Actor Pronunciation Guide & Bilabial Visemes ({line.visemeAnchors.length} anchors)
+                            </span>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="mt-2.5 p-3.5 rounded-xl bg-apple-gray-50/80 dark:bg-darkroom-elevated/40 border border-apple-gray-100 dark:border-darkroom-border/60 animate-fade-in space-y-3">
+                              {/* Pronunciation Guide Chips */}
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-apple-gray-400 block mb-1.5">
+                                  Phonetic IPA & Voice Actor Stress Notes:
+                                </span>
+                                <div className="flex flex-wrap gap-2">
+                                  {line.pronunciationNotes.map((pn, pIdx) => (
+                                    <div
+                                      key={pIdx}
+                                      className="rounded-lg border border-apple-gray-200/80 bg-white px-2.5 py-1.5 shadow-2xs dark:border-darkroom-border dark:bg-darkroom-elevated text-xs"
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <strong className="text-apple-gray-900 dark:text-white">{pn.word}</strong>
+                                        <span className="font-mono text-apple-blue dark:text-blue-400 text-[11px]">
+                                          {pn.ipa}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-apple-gray-500 mt-0.5">
+                                        Phonetic: <span className="font-mono">{pn.phoneticSpelling}</span> · Stress: <strong className="text-emerald-600">{pn.stressSyllable}</strong>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Bilabial Lip-Sync Anchors */}
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-apple-gray-400 block mb-1.5">
+                                  Bilabial Lip Closures (/p, b, m/) for Neural Lip-Sync:
+                                </span>
+                                <div className="flex flex-wrap gap-2">
+                                  {line.visemeAnchors.map((va, vIdx) => (
+                                    <span
+                                      key={vIdx}
+                                      className="inline-flex items-center gap-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 px-2 py-0.5 text-[10px] font-mono font-semibold"
+                                    >
+                                      <span>/{va.phoneme}/</span>
+                                      <span>&rarr; Frame #{va.targetFrame}</span>
+                                      <span className="opacity-70">(Closure)</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Cultural / Direction Notes */}
+                              {line.culturalNotes && (
+                                <div className="text-[11px] text-apple-gray-500 italic border-t border-apple-gray-100 dark:border-darkroom-border/60 pt-2">
+                                  <strong>Direction Note:</strong> {line.culturalNotes}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Target Language Selection Pills */}
-            <div className="flex items-center gap-2 border-b border-apple-gray-200/80 pb-3 dark:border-darkroom-border">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-apple-gray-400 mr-1">
-                Target Language:
-              </span>
-              {project.targetLanguages.map((tl) => (
-                <button
-                  key={tl.code}
-                  onClick={() => setSelectedLangCode(tl.code)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
-                    selectedLangCode === tl.code
-                      ? 'bg-apple-blue text-white shadow-sm font-semibold'
-                      : 'bg-apple-gray-100 text-apple-gray-700 hover:bg-apple-gray-200 dark:bg-darkroom-elevated dark:text-apple-gray-300'
-                  }`}
-                >
-                  <span>{tl.flag}</span>
-                  <span>{tl.name}</span>
-                </button>
-              ))}
-            </div>
+            {/* Subview 2: Raw Speech Extraction & Alignment (WhisperX / Demucs) */}
+            {transcreationView === 'SPEECH_ASR' && (
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-apple-gray-900 dark:text-white">
+                      Dialogue Extraction & Speaker Diarization
+                    </h3>
+                    <p className="text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
+                      Demucs v4 vocal stem isolation and WhisperX large-v3 word-level forced alignment.
+                    </p>
+                  </div>
 
-            {/* Dialogue Segments Cards */}
-            <div className="space-y-4">
-              {dialogueSegments.map((seg) => {
-                const isExpanded = expandedSegmentId === seg.id;
-                return (
-                  <div
-                    key={seg.id}
-                    className={`rounded-2xl border bg-apple-surface shadow-apple-sm transition-all overflow-hidden ${
-                      seg.needsReview
-                        ? 'border-amber-300 dark:border-amber-700/60 ring-1 ring-amber-400/20'
-                        : 'border-apple-gray-200 dark:border-darkroom-border hover:border-apple-gray-300 dark:hover:border-darkroom-border/80'
-                    }`}
-                  >
-                    {/* Card Top Bar */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-apple-gray-100 bg-apple-gray-50/50 px-4 py-2.5 dark:border-darkroom-border/60 dark:bg-darkroom-elevated/40 text-xs">
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-mono text-[11px] font-bold text-apple-gray-400">
-                          {seg.id}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-md bg-apple-blue/10 px-2 py-0.5 text-xs font-semibold text-apple-blue dark:bg-blue-500/20 dark:text-blue-300">
-                          <UserCheck className="h-3 w-3" />
-                          <span>{seg.speakerName}</span>
-                          <span className="font-mono text-[10px] opacity-75">({seg.speakerId})</span>
-                        </span>
-                        <span className="font-mono text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
-                          {seg.timecodeIn} → {seg.timecodeOut}
-                        </span>
-                      </div>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={async () => {
+                        if (!selectedReel || !project) return;
+                        setIsProcessingSpeech(true);
+                        try {
+                          const audioUri = simulateNoise
+                            ? 's3://cinema-vault-raw/noisy_take_01.wav'
+                            : selectedReel.s3MasterUri || 's3://cinema-vault-raw/reel_01.wav';
+                          const results = await speechProcessingApi.triggerSpeechProcessing(
+                            project.id,
+                            selectedReel.id,
+                            audioUri,
+                            {
+                              characterRoster: [
+                                'Commander Elena Vance',
+                                'Chief Engineer Kaelen',
+                                'Dr. Marcus Thorne',
+                              ],
+                              denoisePrefilter: true,
+                            },
+                            (stg, pct) => {
+                              setSpeechStage(stg);
+                              setSpeechProgress(pct);
+                            }
+                          );
+                          setDialogueSegments(results);
+                        } finally {
+                          setIsProcessingSpeech(false);
+                        }
+                      }}
+                      disabled={isProcessingSpeech}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-apple-blue px-3 py-1.5 text-xs font-semibold text-white shadow-glow-blue hover:bg-apple-blue-hover active:scale-95 disabled:opacity-50 transition-all"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>{isProcessingSpeech ? 'Processing ASR...' : 'Extract Audio Dialogue'}</span>
+                    </button>
+                  </div>
+                </div>
 
-                      <div className="flex items-center gap-2">
-                        {seg.needsReview ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                            <AlertTriangle className="h-3 w-3" />
-                            <span>Low SNR ({seg.snrDb} dB) · Manual Review Required</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                            <CheckCircle2 className="h-3 w-3" />
-                            <span>Clean Stem · SNR {seg.snrDb} dB</span>
-                          </span>
-                        )}
-                        <span className="font-mono text-[11px] text-apple-gray-400">
-                          {seg.detectedLanguage} ({(seg.languageConfidence * 100).toFixed(0)}%)
-                        </span>
-                      </div>
+                {/* Live Speech Progress Ribbon */}
+                {isProcessingSpeech && (
+                  <div className="p-4 bg-apple-blue/5 border border-apple-blue/20 rounded-2xl dark:bg-apple-blue/10 animate-fade-in shadow-2xs">
+                    <div className="flex items-center justify-between text-xs font-semibold text-apple-blue dark:text-blue-400 mb-1.5">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-apple-blue animate-pulse" />
+                        <span>{speechStage}</span>
+                      </span>
+                      <span className="font-mono">{speechProgress}%</span>
                     </div>
-
-                    {/* Script Comparison Columns */}
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Original Master Audio Dialogue */}
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-apple-gray-400">
-                          Original Master Script ({project.sourceLanguage.name})
-                        </span>
-                        <div className="p-3 rounded-xl bg-apple-gray-50 dark:bg-darkroom-elevated/60 text-xs font-medium text-apple-gray-800 dark:text-apple-gray-200 border border-apple-gray-100 dark:border-darkroom-border/40">
-                          "{seg.sourceText}"
-                        </div>
-                      </div>
-
-                      {/* Transcreated Localized Dialogue */}
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-apple-gray-400 flex items-center justify-between">
-                          <span>Transcreated Script ({selectedLangCode})</span>
-                          <span className="text-emerald-600 font-mono text-[10px]">&plusmn;0 Syllable Drift</span>
-                        </span>
-                        <textarea
-                          rows={2}
-                          value={seg.targetText || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setDialogueSegments((prev) =>
-                              prev.map((s) => (s.id === seg.id ? { ...s, targetText: val } : s))
-                            );
-                          }}
-                          className="w-full p-2.5 rounded-xl border border-apple-gray-200 bg-white text-xs text-apple-gray-900 focus:border-apple-blue focus:ring-1 focus:ring-apple-blue dark:border-darkroom-border dark:bg-darkroom-elevated dark:text-white transition-colors"
-                        />
-                      </div>
+                    <div className="h-1.5 w-full bg-apple-blue/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-apple-blue rounded-full transition-all duration-300"
+                        style={{ width: `${speechProgress}%` }}
+                      />
                     </div>
+                  </div>
+                )}
 
-                    {/* Word-Level Phoneme Alignment Toggle */}
-                    <div className="px-4 pb-3">
-                      <button
-                        onClick={() => setExpandedSegmentId(isExpanded ? null : seg.id)}
-                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-apple-blue hover:text-apple-blue-hover dark:text-blue-400 transition-colors"
+                {/* Segments Cards */}
+                <div className="space-y-4">
+                  {dialogueSegments.map((seg) => {
+                    const isExpanded = expandedSegmentId === seg.id;
+                    return (
+                      <div
+                        key={seg.id}
+                        className="rounded-2xl border border-apple-gray-200 bg-apple-surface shadow-apple-sm p-4 dark:border-darkroom-border dark:bg-darkroom-surface"
                       >
-                        {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                        <span>
-                          {isExpanded ? 'Hide' : 'Show'} Word-Level Forced Alignment ({seg.words.length} words &plusmn;10ms)
-                        </span>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="mt-2.5 p-3 rounded-xl bg-apple-gray-50/80 dark:bg-darkroom-elevated/40 border border-apple-gray-100 dark:border-darkroom-border/60 animate-fade-in">
-                          <div className="flex flex-wrap gap-2">
-                            {seg.words.map((w, wIdx) => (
+                        <div className="flex items-center justify-between text-xs mb-2">
+                          <div className="flex items-center gap-2 font-mono">
+                            <span className="font-bold text-apple-gray-400">{seg.id}</span>
+                            <span className="text-apple-blue font-semibold">{seg.speakerName}</span>
+                            <span className="text-apple-gray-500">
+                              {seg.timecodeIn} &rarr; {seg.timecodeOut}
+                            </span>
+                          </div>
+                          <span className="font-mono text-[11px] text-emerald-600 font-semibold">
+                            SNR {seg.snrDb} dB
+                          </span>
+                        </div>
+                        <p className="text-xs text-apple-gray-800 dark:text-apple-gray-200 italic mb-2">
+                          "{seg.sourceText}"
+                        </p>
+                        <button
+                          onClick={() => setExpandedSegmentId(isExpanded ? null : seg.id)}
+                          className="text-[11px] font-semibold text-apple-blue hover:underline"
+                        >
+                          {isExpanded ? 'Hide' : 'Show'} Word Timings ({seg.words.length} words)
+                        </button>
+                        {isExpanded && (
+                          <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-apple-gray-100 dark:border-darkroom-border">
+                            {seg.words.map((w, idx) => (
                               <div
-                                key={wIdx}
-                                className="flex flex-col items-center rounded-lg border border-apple-gray-200/80 bg-white px-2 py-1 shadow-2xs dark:border-darkroom-border dark:bg-darkroom-elevated"
+                                key={idx}
+                                className="rounded border bg-white dark:bg-darkroom-elevated px-2 py-1 text-[11px]"
                               >
-                                <span className="font-semibold text-xs text-apple-gray-900 dark:text-white">
-                                  {w.word}
-                                </span>
-                                <span className="font-mono text-[9px] text-apple-gray-400">
+                                <span className="font-bold">{w.word}</span>{' '}
+                                <span className="font-mono text-apple-gray-400 text-[10px]">
                                   {w.startTime.toFixed(2)}s - {w.endTime.toFixed(2)}s
-                                </span>
-                                <span className="font-mono text-[9px] font-medium text-emerald-600 dark:text-emerald-400">
-                                  {(w.confidence * 100).toFixed(0)}%
                                 </span>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Bottom Target Language Verification Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-apple-gray-200/60 dark:border-darkroom-border/60">
@@ -811,6 +1260,7 @@ export const ProjectDetailPage: React.FC = () => {
             </div>
           </div>
         )}
+
 
 
         {/* Tab 3: Voice & Stems */}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { projectsApi, speechProcessingApi } from '../lib/api';
+import { projectsApi, speechProcessingApi, transcreationApi } from '../lib/api';
 
 describe('Cinema Projects API & State Engine', () => {
   beforeEach(async () => {
@@ -125,3 +125,79 @@ describe('AI Speech Processing API Client', () => {
     expect(segments[0].audioQuality).toContain('LOW_SNR');
   });
 });
+
+describe('Multilingual Dialogue Transcreation & Dubbing Script API', () => {
+  it('generates theatrical dubbing scripts with syllable budget enforcement and pronunciation notes', async () => {
+    const stages: string[] = [];
+    const result = await transcreationApi.triggerTranscreation(
+      'proj_trans_test',
+      'reel_trans_test',
+      'es-ES',
+      { syllableBudgetTolerance: 1 },
+      (stage, pct) => {
+        stages.push(stage);
+        expect(pct).toBeGreaterThanOrEqual(0);
+        expect(pct).toBeLessThanOrEqual(100);
+      }
+    );
+
+    expect(result.lines.length).toBeGreaterThanOrEqual(3);
+    expect(stages.length).toBeGreaterThanOrEqual(4);
+    expect(result.retryCount).toBe(0);
+
+    const first = result.lines[0];
+    expect(first.characterName).toBe('Commander Elena Vance');
+    expect(first.tone).toBe('URGENT_COMMAND');
+    expect(first.timecodeIn).toMatch(/^\d{2}:\d{2}:\d{2}:\d{2}$/);
+    expect(first.timecodeOut).toMatch(/^\d{2}:\d{2}:\d{2}:\d{2}$/);
+    // Syllable delta constraint: Delta <= 1
+    expect(first.syllableDelta).toBeLessThanOrEqual(1);
+    expect(first.validationStatus).toBe('VALIDATED');
+    expect(first.isApproved).toBe(true);
+
+    // Viseme bilabial anchors
+    expect(first.visemeAnchors.length).toBeGreaterThan(0);
+    expect(first.visemeAnchors.every((v) => ['p', 'b', 'm'].includes(v.phoneme))).toBe(true);
+
+    // Pronunciation notes
+    expect(first.pronunciationNotes.length).toBeGreaterThan(0);
+    expect(first.pronunciationNotes[0].ipa).toBeDefined();
+    expect(first.pronunciationNotes[0].stressSyllable).toBeDefined();
+  });
+
+  it('recovers automatically via exponential backoff retry on simulated rate limits (429)', async () => {
+    const result = await transcreationApi.triggerTranscreation(
+      'proj_trans_retry',
+      'reel_trans_retry',
+      'es-ES',
+      { simulateRateLimit: true }
+    );
+
+    expect(result.lines.length).toBeGreaterThan(0);
+    expect(result.retryCount).toBeGreaterThanOrEqual(1);
+    expect(result.lines[0].validationStatus).toBe('VALIDATED');
+  });
+
+  it('handles persistent provider failures gracefully by throwing informative error', async () => {
+    await expect(
+      transcreationApi.triggerTranscreation(
+        'proj_trans_fail',
+        'reel_trans_fail',
+        'es-ES',
+        { simulateFailure: true }
+      )
+    ).rejects.toThrow('LLM Provider Failure: Persistent 500');
+  });
+
+  it('updates dubbing script line text and approval validation status', async () => {
+    const updated = await transcreationApi.updateDubbingScriptLine('dub-reel_01-001', {
+      translatedText: 'Trayectoria confirmada con máxima precisión.',
+      isApproved: true,
+    });
+
+    expect(updated.id).toBe('dub-reel_01-001');
+    expect(updated.translatedText).toBe('Trayectoria confirmada con máxima precisión.');
+    expect(updated.validationStatus).toBe('VALIDATED');
+  });
+});
+

@@ -1,4 +1,16 @@
-import { FilmProject, CreateProjectInput, StudioMetrics, Reel, Shot, DialogueSegment, SpeechJob } from '../types/project';
+import {
+  FilmProject,
+  CreateProjectInput,
+  StudioMetrics,
+  Reel,
+  Shot,
+  DialogueSegment,
+  SpeechJob,
+  DubbingScriptLine,
+  ToneProfile,
+  ValidationStatus,
+  TranscreationJob,
+} from '../types/project';
 import { DEMO_PROJECTS, SUPPORTED_LANGUAGES } from './demoData';
 import { MediaMetadata, MultipartUploadSession, UploadPart } from '../types/ingest';
 import {
@@ -481,6 +493,206 @@ export const speechProcessingApi = {
 
     onProgress?.('Speech processing and speaker attribution complete.', 100);
     return segments;
+  },
+};
+
+/**
+ * Multilingual Dialogue Transcreation, Syllable Budgeting & Dubbing Script API Client
+ */
+export const transcreationApi = {
+  async triggerTranscreation(
+    _projectId: string,
+    reelId: string,
+    targetLanguage: string = 'es-ES',
+    options?: {
+      syllableBudgetTolerance?: number;
+      simulateFailure?: boolean;
+      simulateRateLimit?: boolean;
+    },
+    onProgress?: (stage: string, percent: number) => void
+  ): Promise<{ lines: DubbingScriptLine[]; retryCount: number }> {
+    onProgress?.('Analyzing scene context, character relationships & dramatic tone...', 15);
+    await new Promise((r) => setTimeout(r, 200));
+
+    let retryCount = 0;
+
+    // Simulate rate limit retry recovery if requested
+    if (options?.simulateRateLimit) {
+      onProgress?.('LLM rate limit (HTTP 429) hit. Applying exponential backoff retry...', 35);
+      await new Promise((r) => setTimeout(r, 300));
+      retryCount = 1;
+      onProgress?.('Retry attempt 1 succeeded via secondary vLLM Qwen-2.5-72B fallback.', 45);
+    }
+
+    // Simulate terminal provider failure if requested
+    if (options?.simulateFailure) {
+      onProgress?.('Connecting to LLM translation gateway...', 30);
+      await new Promise((r) => setTimeout(r, 200));
+      throw new Error('LLM Provider Failure: Persistent 500 Gateway Timeout after 3 retries.');
+    }
+
+    onProgress?.('Generating theatrical transcreation with Claude 3.5 Sonnet...', 55);
+    await new Promise((r) => setTimeout(r, 250));
+
+    onProgress?.('Verifying syllable budget envelope (Δ ≤ ±1 syllable)...', 75);
+    await new Promise((r) => setTimeout(r, 200));
+
+    onProgress?.('Indexing bilabial viseme closures (/p, b, m/) for lip-sync...', 90);
+    await new Promise((r) => setTimeout(r, 150));
+
+    const isSpanish = targetLanguage.startsWith('es');
+    const isFrench = targetLanguage.startsWith('fr');
+
+    const lines: DubbingScriptLine[] = [
+      {
+        id: `dub-${reelId}-001`,
+        shotId: 'shot-101',
+        timecodeIn: '01:00:01:06',
+        timecodeOut: '01:00:04:18',
+        startSeconds: 1.25,
+        endSeconds: 4.75,
+        characterId: 'char_elena',
+        characterName: 'Commander Elena Vance',
+        characterRelationship: 'Commanding lead pilot directing operations',
+        sceneContext: 'Deep space command bridge during atmospheric entry descent',
+        tone: 'URGENT_COMMAND',
+        sourceLanguage: 'en-US',
+        targetLanguage,
+        sourceText: 'Orbital trajectory confirmed. Atmospheric entry vector initialized.',
+        translatedText: isSpanish
+          ? 'Trayectoria orbital lista. Vector de reentrada iniciado.'
+          : isFrench
+          ? 'Trajectoire orbitale prête. Vecteur de rentrée enclenché.'
+          : 'Flugbahn bestätigt. Atmosphärischer Eintrittsvektor gestartet.',
+        sourceSyllables: 21,
+        targetSyllables: 20,
+        syllableDelta: 1,
+        durationDeltaPercent: -4.8,
+        validationStatus: 'VALIDATED',
+        isApproved: true,
+        culturalNotes: 'Preserved formal military aerospace protocol.',
+        visemeAnchors: [
+          { viseme: 'bilabial', targetFrame: 34, phoneme: 'b', isClosure: true },
+          { viseme: 'bilabial', targetFrame: 78, phoneme: 'p', isClosure: true },
+        ],
+        pronunciationNotes: [
+          {
+            word: isSpanish ? 'Trayectoria' : 'Trajectoire',
+            ipa: isSpanish ? '[tɾa.ʝekˈto.ɾja]' : '[tʁa.ʒɛk.twaʁ]',
+            phoneticSpelling: isSpanish ? 'trah-yek-TOH-ryah' : 'trah-zhek-TWAHR',
+            stressSyllable: isSpanish ? 'TOH' : 'TWAHR',
+          },
+          {
+            word: isSpanish ? 'reentrada' : 'enclenché',
+            ipa: isSpanish ? '[re.enˈtɾa.ða]' : '[ɑ̃.klɑ̃.ʃe]',
+            phoneticSpelling: isSpanish ? 'reh-en-TRAH-thah' : 'ahn-klahn-SHAY',
+            stressSyllable: isSpanish ? 'TRAH' : 'SHAY',
+          },
+        ],
+      },
+      {
+        id: `dub-${reelId}-002`,
+        shotId: 'shot-102',
+        timecodeIn: '01:00:06:00',
+        timecodeOut: '01:00:10:12',
+        startSeconds: 6.0,
+        endSeconds: 10.5,
+        characterId: 'char_kaelen',
+        characterName: 'Chief Engineer Kaelen',
+        characterRelationship: 'Senior propulsion engineer reporting to Commander Vance',
+        sceneContext: 'Engineering deck adjusting ion engine coils under heat load',
+        tone: 'URGENT_COMMAND',
+        sourceLanguage: 'en-US',
+        targetLanguage,
+        sourceText: 'Shield frequency holding at ninety-two percent. Keep the main thrusters synchronized.',
+        translatedText: isSpanish
+          ? 'Escudos al noventa y dos por ciento. Propulsores sincronizados.'
+          : isFrench
+          ? 'Boucliers à quatre-vingt-douze pour cent. Synchronisez les propulseurs.'
+          : 'Schildfrequenz stabil bei zweiundneunzig Prozent. Triebwerke synchronisieren.',
+        sourceSyllables: 21,
+        targetSyllables: 21,
+        syllableDelta: 0,
+        durationDeltaPercent: 0.0,
+        validationStatus: 'VALIDATED',
+        isApproved: true,
+        culturalNotes: 'Precise technical cadence with zero syllable drift.',
+        visemeAnchors: [
+          { viseme: 'bilabial', targetFrame: 154, phoneme: 'p', isClosure: true },
+          { viseme: 'bilabial', targetFrame: 210, phoneme: 'm', isClosure: true },
+        ],
+        pronunciationNotes: [
+          {
+            word: isSpanish ? 'propulsores' : 'propulseurs',
+            ipa: isSpanish ? '[pɾo.pulˈso.ɾes]' : '[pʁɔ.pyl.sœʁ]',
+            phoneticSpelling: isSpanish ? 'pro-pool-SOH-res' : 'pro-pül-SOOR',
+            stressSyllable: isSpanish ? 'SOH' : 'SOOR',
+          },
+        ],
+      },
+      {
+        id: `dub-${reelId}-003`,
+        shotId: 'shot-103',
+        timecodeIn: '01:00:12:08',
+        timecodeOut: '01:00:16:04',
+        startSeconds: 12.33,
+        endSeconds: 16.16,
+        characterId: 'char_elena',
+        characterName: 'Commander Elena Vance',
+        characterRelationship: 'Reporting emergency warning status to cockpit crew',
+        sceneContext: 'Hull sensor panel flashing red warning indicators',
+        tone: 'URGENT_COMMAND',
+        sourceLanguage: 'en-US',
+        targetLanguage,
+        sourceText: 'We have an anomalous radiation signature breaching the forward bulkhead.',
+        translatedText: isSpanish
+          ? 'Firma anómala de radiación que cruza el mamparo de proa.'
+          : isFrench
+          ? 'Signature de radiation anormale à travers la cloison avant.'
+          : 'Anomale Strahlungssignatur durchbricht das vordere Schott.',
+        sourceSyllables: 20,
+        targetSyllables: 20,
+        syllableDelta: 0,
+        durationDeltaPercent: 0.0,
+        validationStatus: 'VALIDATED',
+        isApproved: true,
+        culturalNotes: 'Tense cinematic pacing with bilabial anchor on /m/ (mamparo).',
+        visemeAnchors: [
+          { viseme: 'bilabial', targetFrame: 312, phoneme: 'm', isClosure: true },
+          { viseme: 'bilabial', targetFrame: 345, phoneme: 'p', isClosure: true },
+        ],
+        pronunciationNotes: [
+          {
+            word: isSpanish ? 'radiación' : 'radiation',
+            ipa: isSpanish ? '[ra.ðjaˈsjon]' : '[ʁa.dja.sjɔ̃]',
+            phoneticSpelling: isSpanish ? 'rah-thyah-SYOHN' : 'rah-dyah-SYOHN',
+            stressSyllable: isSpanish ? 'SYOHN' : 'SYOHN',
+          },
+          {
+            word: isSpanish ? 'mamparo' : 'cloison',
+            ipa: isSpanish ? '[mamˈpa.ɾo]' : '[klwa.zɔ̃]',
+            phoneticSpelling: isSpanish ? 'mahm-PAH-ro' : 'klwah-ZOHN',
+            stressSyllable: isSpanish ? 'PAH' : 'ZOHN',
+          },
+        ],
+      },
+
+    ];
+
+    onProgress?.('Dubbing script transcreation & timing alignment complete.', 100);
+    return { lines, retryCount };
+  },
+
+  async updateDubbingScriptLine(
+    lineId: string,
+    updates: Partial<DubbingScriptLine>
+  ): Promise<Partial<DubbingScriptLine>> {
+    await new Promise((r) => setTimeout(r, 60));
+    return {
+      id: lineId,
+      ...updates,
+      validationStatus: updates.isApproved ? 'VALIDATED' : 'MANUALLY_EDITED',
+    };
   },
 };
 

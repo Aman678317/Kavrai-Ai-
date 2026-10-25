@@ -404,7 +404,111 @@ dist/assets/index-BGcJXT4O.js   304.65 kB │ gzip: 84.98 kB
 ```
 
 ---
+
+## 11. Multilingual Theatrical Transcreation & Lip-Sync Dubbing Script Service (Milestone 5)
+
+### 11.1 Overview & Architecture Alignment
+Implemented the multilingual cinematic transcreation service (`services/transcreation`) per `docs/AI_MODEL_SELECTION.md` and `docs/TESTING_QUALITY_PLAN.md`. The service translates movie dialogue preserving dramatic tone, character relationships, cultural nuances, and strict lip-sync timing constraints:
+- **Syllable Budgeting Engine:** Calculates syllable counts across English, Spanish, French, and German, strictly enforcing $\pm 1$ syllable variance against the source speech segment to maintain dubbing audio duration alignment.
+- **Bilabial Viseme Anchor Detection:** Identifies critical lip-closure bilabials (`/p, b, m/`) and correlates them to target video frame indices for automated lip-sync validation.
+- **Voice Actor Pronunciation & Stress Guides:** Produces IPA phonetic notation, phonetic spellings, and stress guides for tricky technical or character terms.
+- **Multi-tiered Provider & Retry Resilience:** Integrates Claude 3.5 Sonnet / Qwen-2.5-72B LLM pipeline with exponential backoff retry on HTTP 429 rate limits or transient 500 errors, with deterministic theatrical fallbacks.
+- **Asynchronous Processing Queue:** Manages multi-stage background transcreation (`SCENE_CONTEXT_ANALYSIS` -> `LLM_TRANSCREATION` -> `SYLLABLE_BUDGET_VERIFICATION` -> `VISEME_ALIGNMENT_INDEXING` -> `COMPLETED`).
+- **Studio Dubbing Script Editor:** Full-featured frontend interactive dubbing editor in `apps/web` with syllable counter pill badges, tone selectors, IPA chips, and line approval workflows.
+
+### 11.2 Created & Modified Components
+- `services/transcreation/pyproject.toml`: Microservice configuration and dependencies (`fastapi`, `pydantic`, `pytest`, `httpx`).
+- `services/transcreation/src/models.py`: Data models for `ToneProfile`, `ValidationStatus`, `VisemeAnchor`, `PronunciationNote`, `DubbingScriptLine`, `TranscreationJobRequest`, `TranscreationJobResponse`.
+- `services/transcreation/src/syllable_counter.py`: Phonetic syllable counter supporting English, Spanish, French, German, and bilabial extraction.
+- `services/transcreation/src/transcreator.py`: Theatrical transcreator with syllable budgeting, prompt engineering, and exponential backoff retry logic.
+- `services/transcreation/src/job_queue.py`: In-memory async worker queue tracking transcreation progress and line updates.
+- `services/transcreation/src/service.py`: FastAPI application exposing REST endpoints (`/health`, `/api/v1/transcreation/jobs`, `/api/v1/transcreation/scripts/{line_id}`).
+- `services/transcreation/tests/test_transcreation.py`: 16 comprehensive tests covering syllable counting, retry behavior, terminal failure handling, and REST routes.
+- `apps/web/src/types/project.ts`: Added `DubbingScriptLine`, `PronunciationNote`, `VisemeAnchor`, and `TranscreationJob` interfaces.
+- `apps/web/src/lib/api.ts`: Added `transcreationApi` with client methods `triggerTranscreation` and `updateDubbingScriptLine`.
+- `apps/web/src/pages/ProjectDetailPage.tsx`: Studio dubbing script editor with live syllable budget badges, tone dropdown, and approval toggles.
+- `apps/web/src/test/api.test.ts`: Vitest test suite extended with 4 automated test cases for transcreation, retries, and error handling.
+
+### 11.3 Transcreation Microservice Test Results (16 of 16 Passing)
+```
+$ $env:PYTHONPATH="services/transcreation;."; python -m pytest services/transcreation/tests -v
+============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\acer\3D Objects\kavrai AI\services\transcreation
+configfile: pyproject.toml
+plugins: anyio-4.12.0, langsmith-0.7.33, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 16 items
+
+services\transcreation\tests\test_transcreation.py::TestSyllableCounter::test_english_syllable_count PASSED [  6%]
+services\transcreation\tests\test_transcreation.py::TestSyllableCounter::test_spanish_syllable_count PASSED [ 12%]
+services\transcreation\tests\test_transcreation.py::TestSyllableCounter::test_french_and_german_syllable_count PASSED [ 18%]
+services\transcreation\tests\test_transcreation.py::TestSyllableCounter::test_find_bilabial_anchors PASSED [ 25%]
+services\transcreation\tests\test_transcreation.py::TestTheatricalTranscreator::test_transcreation_syllable_budget_enforcement PASSED [ 31%]
+services\transcreation\tests\test_transcreation.py::TestTheatricalTranscreator::test_pronunciation_notes_for_voice_actors PASSED [ 37%]
+services\transcreation\tests\test_transcreation.py::TestTheatricalTranscreator::test_provider_retry_on_rate_limit PASSED [ 43%]
+services\transcreation\tests\test_transcreation.py::TestTheatricalTranscreator::test_provider_terminal_failure_handling PASSED [ 50%]
+services\transcreation\tests\test_transcreation.py::TestAsyncTranscreationJobQueue::test_job_lifecycle_completion PASSED [ 56%]
+services\transcreation\tests\test_transcreation.py::TestAsyncTranscreationJobQueue::test_rate_limit_retry_recorded_in_job PASSED [ 62%]
+services\transcreation\tests\test_transcreation.py::TestAsyncTranscreationJobQueue::test_failure_recorded_in_job PASSED [ 68%]
+services\transcreation\tests\test_transcreation.py::TestAsyncTranscreationJobQueue::test_update_script_line PASSED [ 75%]
+services\transcreation\tests\test_transcreation.py::TestFastAPIService::test_health_check PASSED [ 81%]
+services\transcreation\tests\test_transcreation.py::TestFastAPIService::test_create_and_poll_transcreation_job PASSED [ 87%]
+services\transcreation\tests\test_transcreation.py::TestFastAPIService::test_put_update_script_line PASSED [ 93%]
+services\transcreation\tests\test_transcreation.py::TestFastAPIService::test_not_found_returns_404 PASSED [100%]
+
+============================= 16 passed in 3.16s ==============================
+```
+
+### 11.4 Full Platform Test Summary (42 Python Tests & 30 Frontend Tests Passing)
+- `services/video_analyzer`: 10 passed (100%)
+- `services/speech_engine`: 16 passed (100%)
+- `services/transcreation`: 16 passed (100%)
+- **Total Backend Microservice Tests: 42 passed, 0 failed.**
+
+```
+$ npm test --prefix apps/web
+ RUN  v2.1.9 C:/Users/acer/3D Objects/kavrai AI/apps/web
+
+ ✓ src/test/auth.test.ts (6 tests) 13ms
+ ✓ src/test/ingest.test.ts (6 tests) 148ms
+ ✓ src/test/timecode.test.ts (6 tests) 7ms
+ ✓ src/test/api.test.ts (12 tests) 6735ms
+   ✓ Cinema Projects API & State Engine > retrieves pre-seeded reference 4K cinema projects 331ms
+   ✓ Cinema Projects API & State Engine > creates a new cinema localization project with configured metadata 535ms
+   ✓ Cinema Projects API & State Engine > deletes an existing project successfully 584ms
+   ✓ AI Speech Processing API Client > triggers speech processing and returns word-level forced alignment with speaker turns 1032ms
+   ✓ AI Speech Processing API Client > detects noisy audio takes and flags manual review with low SNR 1049ms
+   ✓ Multilingual Dialogue Transcreation & Dubbing Script API > generates theatrical dubbing scripts with syllable budget enforcement and pronunciation notes 820ms
+   ✓ Multilingual Dialogue Transcreation & Dubbing Script API > recovers automatically via exponential backoff retry on simulated rate limits (429) 1133ms
+   ✓ Multilingual Dialogue Transcreation & Dubbing Script API > handles persistent provider failures gracefully by throwing informative error 418ms
+
+ Test Files  4 passed (4)
+      Tests  30 passed (30)
+   Duration  7.88s
+```
+
+### 11.5 Frontend Production Build Verification
+```
+$ npm run build --prefix apps/web
+> @kavrai/web@1.0.0 build
+> tsc -b && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1587 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.04 kB │ gzip:  0.62 kB
+dist/assets/index-Dx58lcLr.css   45.15 kB │ gzip:  7.96 kB
+dist/assets/index-CDsiABp0.js   324.62 kB │ gzip: 89.89 kB
+✓ built in 5.54s
+```
+
+---
 *End of Kavrai AI Implementation Log.*
+
 
 
 

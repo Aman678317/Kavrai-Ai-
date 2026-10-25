@@ -140,3 +140,84 @@ export interface SpeechJob {
   vocalStemS3Uri?: string;
   error?: string;
 }
+
+export type ToneProfile =
+  | 'URGENT_COMMAND'
+  | 'WHISPER_CONSPIRATORIAL'
+  | 'CALM_TECHNICAL'
+  | 'INTIMATE_EMOTIONAL'
+  | 'SARCASTIC_WIT';
+
+export type ValidationStatus =
+  | 'VALIDATED'
+  | 'NEEDS_REVIEW'
+  | 'SYLLABLE_MISMATCH'
+  | 'MANUALLY_EDITED';
+
+export interface VisemeAnchor {
+  viseme: string;
+  targetFrame: number;
+  phoneme: string;
+  isClosure: boolean;
+}
+
+export interface PronunciationNote {
+  word: string;
+  ipa: string;
+  phoneticSpelling: string;
+  stressSyllable: string;
+  stress_syllable?: string;
+  audioCue?: string;
+}
+
+export interface DubbingScriptLine {
+  id: string;
+  shotId?: string;
+  timecodeIn: string;
+  timecodeOut: string;
+  startSeconds: number;
+  endSeconds: number;
+  characterId: string;
+  characterName: string;
+  characterRelationship: string;
+  sceneContext: string;
+  scene_context?: string;
+  tone: ToneProfile;
+  sourceLanguage: string;
+  targetLanguage: string;
+  sourceText: string;
+  translatedText: string;
+  sourceSyllables: number;
+  targetSyllables: number;
+  syllableDelta: number;
+  durationDeltaPercent: number;
+  visemeAnchors: VisemeAnchor[];
+  pronunciationNotes: PronunciationNote[];
+  culturalNotes?: string;
+  validationStatus: ValidationStatus;
+  isApproved: boolean;
+}
+
+export interface TranscreationJob {
+  jobId: string;
+  projectId: string;
+  reelId: string;
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  stage:
+    | 'QUEUED'
+    | 'SCENE_CONTEXT_ANALYSIS'
+    | 'LLM_TRANSCREATION'
+    | 'SYLLABLE_BUDGET_VERIFICATION'
+    | 'VISEME_ALIGNMENT_INDEXING'
+    | 'COMPLETED'
+    | 'FAILED';
+  progressPercent: number;
+  targetLanguage: string;
+  scriptLines: DubbingScriptLine[];
+  totalSyllablesSource: number;
+  totalSyllablesTarget: number;
+  averageSyllableDelta: number;
+  retryCount: number;
+  providerUsed: string;
+  error?: string;
+}
