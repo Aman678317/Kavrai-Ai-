@@ -191,5 +191,55 @@ dist/assets/index-CpJwCOfI.js   263.76 kB │ gzip: 74.95 kB
 ```
 
 ---
+
+## 8. Secure Movie Upload & Media Ingestion Engine
+
+### 8.1 Architectural Inventory
+| File Path | Component / Feature |
+| :--- | :--- |
+| `apps/web/src/types/ingest.ts` | Ingestion domain models (`MediaMetadata`, `UploadPart`, `MultipartUploadSession`, `IngestReelResult`). |
+| `apps/web/src/lib/mediaInspector.ts` | Client-side metadata probe: duration, resolution (4K DCI / UHD), aspect ratio math (`2.39:1`, `1.85:1`, `16:9`), frame rate (24.0 fps), container/codec identification (ProRes 422 HQ, DNxHR, H.264/HEVC), and file validation. |
+| `apps/web/src/lib/multipartUploader.ts` | S3 Multipart chunk calculation (5MB slices), streaming upload simulation, Pause/Resume, and network timeout retry. |
+| `apps/web/src/lib/api.ts` | Added `mediaIngestApi` (initiate, uploadPart, complete) and `projectsApi.attachReel`. |
+| `apps/web/src/components/ingest/MediaIngestModal.tsx` | Apple Pro glassmorphism uploader with drag-and-drop, live metadata inspection card, S3 key preview, granular chunk grid visualizer, pause/resume, and packet drop recovery test toggle. |
+| `apps/web/src/pages/ProjectDetailPage.tsx` | Integrated "Ingest Master Reel" action in Reels breakdown tab. |
+| `apps/web/src/pages/DashboardPage.tsx` | Integrated "Ingest Reel" quick action in dashboard studio header. |
+| `apps/web/src/test/ingest.test.ts` | Automated unit tests covering file validation, aspect ratio math, codec detection, chunk slicing, deterministic S3 key derivation, and failure retry. |
+
+### 8.2 Test Results (All 24 Tests Passing)
+```
+> @kavrai/web@1.0.0 test
+> vitest run
+
+ RUN  v2.1.9 C:/Users/acer/3D Objects/kavrai AI/apps/web
+
+ ✓ src/test/auth.test.ts (6 tests) 13ms
+ ✓ src/test/ingest.test.ts (6 tests) 98ms
+ ✓ src/test/timecode.test.ts (6 tests) 4ms
+ ✓ src/test/api.test.ts (6 tests) 2173ms
+
+ Test Files  4 passed (4)
+      Tests  24 passed (24)
+   Duration  3.37s
+```
+
+### 8.3 Production Build Verification
+```
+> @kavrai/web@1.0.0 build
+> tsc -b && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1587 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.04 kB │ gzip:  0.62 kB
+dist/assets/index-DpB9BDlY.css   42.62 kB │ gzip:  7.55 kB
+dist/assets/index-DMEm-oh8.js   285.45 kB │ gzip: 80.32 kB
+✓ built in 5.46s
+```
+
+---
 *End of Kavrai AI Implementation Log.*
+
 

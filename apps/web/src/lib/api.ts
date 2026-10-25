@@ -1,5 +1,11 @@
-import { FilmProject, CreateProjectInput, StudioMetrics } from '../types/project';
+import { FilmProject, CreateProjectInput, StudioMetrics, Reel } from '../types/project';
 import { DEMO_PROJECTS, SUPPORTED_LANGUAGES } from './demoData';
+import { MediaMetadata, MultipartUploadSession, UploadPart } from '../types/ingest';
+import {
+  createMultipartSession,
+  uploadPartChunk,
+  finalizeUploadSession,
+} from './multipartUploader';
 
 const STORAGE_KEY = 'kavrai_cinema_projects';
 let inMemoryProjects: FilmProject[] | null = null;
@@ -204,4 +210,63 @@ export const projectsApi = {
       totalProcessedRuntimeHours: Math.round((totalMinutes / 60) * 10) / 10,
     };
   },
+
+  /**
+   * Attach an ingested master reel to an existing project
+   */
+  async attachReel(projectId: string, reel: Reel): Promise<FilmProject | null> {
+    await new Promise((r) => setTimeout(r, 100));
+    const projects = getStoredProjects();
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return null;
+
+    project.reels.push(reel);
+    saveProjects(projects);
+    return project;
+  },
 };
+
+/**
+ * Theatrical Media Ingestion & S3 Multipart API Client
+ */
+export const mediaIngestApi = {
+  /**
+   * Initiate multipart upload session with key derivation
+   */
+  async initiateUpload(
+    projectId: string,
+    fileName: string,
+    fileSizeBytes: number,
+    metadata?: MediaMetadata
+  ): Promise<MultipartUploadSession> {
+    await new Promise((r) => setTimeout(r, 100));
+    return createMultipartSession(projectId, fileName, fileSizeBytes, metadata);
+  },
+
+  /**
+   * Upload a specific chunk part
+   */
+  async uploadPart(
+    session: MultipartUploadSession,
+    partNumber: number,
+    options?: { simulateFailure?: boolean; onProgress?: (p: number, pct: number) => void }
+  ): Promise<UploadPart> {
+    return uploadPartChunk(session, partNumber, options);
+  },
+
+  /**
+   * Finalize and seal the S3 multipart upload
+   */
+  async completeUpload(session: MultipartUploadSession): Promise<{ s3Uri: string; status: string }> {
+    await new Promise((r) => setTimeout(r, 100));
+    const ok = finalizeUploadSession(session);
+    if (!ok) {
+      throw new Error('Cannot complete upload: not all parts are finished.');
+    }
+    return {
+      s3Uri: session.s3Uri,
+      status: 'UPLOAD_COMPLETE',
+    };
+  },
+};
+

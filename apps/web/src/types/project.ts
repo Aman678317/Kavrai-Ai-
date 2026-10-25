@@ -29,6 +29,9 @@ export interface Reel {
   shotCount: number;
   status: PipelineStatus;
   progressPercentage: number;
+  s3MasterUri?: string;
+  timecodeIn?: string;
+  timecodeOut?: string;
 }
 
 export interface Shot {

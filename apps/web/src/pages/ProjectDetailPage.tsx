@@ -12,11 +12,13 @@ import {
   Lock,
   Sliders,
   UserCheck,
+  UploadCloud,
 } from 'lucide-react';
 import { FilmProject, Reel, Shot } from '../types/project';
 import { projectsApi } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { CinemaPlayerModal } from '../components/player/CinemaPlayerModal';
+import { MediaIngestModal } from '../components/ingest/MediaIngestModal';
 
 const MOCK_SHOTS: Shot[] = [
   {
@@ -72,6 +74,7 @@ export const ProjectDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'REELS' | 'TRANSCREATION' | 'VOICE' | 'DELIVERY'>('REELS');
   const [selectedReel, setSelectedReel] = useState<Reel | null>(null);
   const [isPlayerOpen, setIsPlayerOpen] = useState<boolean>(false);
+  const [isIngestOpen, setIsIngestOpen] = useState<boolean>(false);
   const [c2paSigned, setC2paSigned] = useState<boolean>(false);
   const [loudnessCalibrated, setLoudnessCalibrated] = useState<boolean>(false);
   const { user, hasPermission } = useAuth();
@@ -272,6 +275,24 @@ export const ProjectDetailPage: React.FC = () => {
         {/* Tab 1: Reels & Shots */}
         {activeTab === 'REELS' && (
           <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-apple-gray-900 dark:text-white">
+                  Conformed Theatrical Reels
+                </h3>
+                <p className="text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
+                  Feature film partitioned into SMPTE standard reels and frame-indexed shots.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsIngestOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-apple-gray-200 bg-apple-surface px-3 py-1.5 text-xs font-semibold text-apple-gray-800 hover:border-apple-blue hover:text-apple-blue dark:border-darkroom-border dark:bg-darkroom-surface dark:text-apple-gray-200 shadow-2xs transition-all"
+              >
+                <UploadCloud className="h-3.5 w-3.5 text-apple-blue" />
+                <span>Ingest Master Reel</span>
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {project.reels.map((reel) => (
                 <div
@@ -526,6 +547,23 @@ export const ProjectDetailPage: React.FC = () => {
           project={project}
           isOpen={isPlayerOpen}
           onClose={() => setIsPlayerOpen(false)}
+        />
+      )}
+
+      {/* S3 Direct Multipart Master Media Ingest Modal */}
+      {project && (
+        <MediaIngestModal
+          isOpen={isIngestOpen}
+          onClose={() => setIsIngestOpen(false)}
+          projectId={project.id}
+          projectTitle={project.title}
+          onReelIngested={(newReel) => {
+            setProject({
+              ...project,
+              reels: [...project.reels, newReel],
+            });
+            setSelectedReel(newReel);
+          }}
         />
       )}
     </div>

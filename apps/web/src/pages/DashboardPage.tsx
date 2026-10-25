@@ -9,11 +9,13 @@ import {
   Globe2,
   CheckCircle2,
   RotateCcw,
+  UploadCloud,
 } from 'lucide-react';
 import { FilmProject, StudioMetrics } from '../types/project';
 import { projectsApi } from '../lib/api';
 import { ProjectCard } from '../components/projects/ProjectCard';
 import { CreateProjectModal } from '../components/projects/CreateProjectModal';
+import { MediaIngestModal } from '../components/ingest/MediaIngestModal';
 import { ProjectEmptyState } from '../components/projects/ProjectEmptyState';
 import { ProjectSkeleton } from '../components/projects/ProjectSkeleton';
 
@@ -24,6 +26,8 @@ export const DashboardPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
+  const [isIngestOpen, setIsIngestOpen] = useState<boolean>(false);
+  const [selectedIngestProject, setSelectedIngestProject] = useState<FilmProject | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
   const fetchProjectsAndMetrics = async () => {
@@ -118,6 +122,20 @@ export const DashboardPage: React.FC = () => {
                 <RotateCcw className="h-3.5 w-3.5 text-cinema-gold" />
                 <span>Reset Demo Reels</span>
               </button>
+
+              {projects.length > 0 && (
+                <button
+                  onClick={() => {
+                    setSelectedIngestProject(projects[0]);
+                    setIsIngestOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-apple-gray-200 bg-apple-surface px-3 py-2.5 text-xs font-semibold text-apple-gray-800 hover:border-apple-blue hover:text-apple-blue dark:border-darkroom-border dark:bg-darkroom-surface dark:text-apple-gray-200 transition-all shadow-2xs"
+                  title="Ingest Media Reel to Active Project"
+                >
+                  <UploadCloud className="h-4 w-4 text-apple-blue" />
+                  <span className="hidden sm:inline">Ingest Reel</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setIsCreateOpen(true)}
@@ -263,6 +281,20 @@ export const DashboardPage: React.FC = () => {
         onClose={() => setIsCreateOpen(false)}
         onSubmit={handleCreateProject}
       />
+
+      {/* Media Ingest Modal */}
+      {selectedIngestProject && (
+        <MediaIngestModal
+          isOpen={isIngestOpen}
+          onClose={() => setIsIngestOpen(false)}
+          projectId={selectedIngestProject.id}
+          projectTitle={selectedIngestProject.title}
+          onReelIngested={() => {
+            fetchProjectsAndMetrics();
+            showNotification('Master reel conformed and attached to project.');
+          }}
+        />
+      )}
     </div>
   );
 };
