@@ -1,0 +1,26 @@
+{
+  "name": "kavrai-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cinema-Grade AI Film Localization Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/web run build",
+    "preview": "npm --prefix apps/web run preview",
+    "test": "npm --prefix apps/web test"
+  },
+  "keywords": [
+    "ai",
+    "film-localization",
+    "lip-sync",
+    "dubbing",
+    "transcreation",
+    "cinema"
+  ],
+  "author": "Kavrai AI Team",
+  "license": "UNLICENSED"
+}
