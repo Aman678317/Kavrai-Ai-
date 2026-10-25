@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Film, Check } from 'lucide-react';
+import { X, Film, Check, Lock } from 'lucide-react';
 import { AspectRatio, CreateProjectInput, FrameRate } from '../../types/project';
 import { SUPPORTED_LANGUAGES } from '../../lib/demoData';
+import { useAuth } from '../../lib/authContext';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -29,6 +30,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const { user, hasPermission } = useAuth();
+  const canCreate = hasPermission('CREATE_PROJECT');
   const [title, setTitle] = useState('');
   const [director, setDirector] = useState('');
   const [studio, setStudio] = useState('');
@@ -42,6 +45,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
 
   const toggleTargetLang = (code: string) => {
     if (targetLangs.includes(code)) {
@@ -302,29 +306,37 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
           </div>
 
           {/* Form Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-apple-gray-100 dark:border-darkroom-border">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="rounded-xl px-4 py-2 text-xs font-semibold text-apple-gray-600 hover:bg-apple-gray-100 dark:text-apple-gray-300 dark:hover:bg-darkroom-elevated transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex items-center gap-2 rounded-xl bg-apple-blue px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-apple-blue-hover active:scale-[0.98] disabled:opacity-50 transition-all"
-            >
-              {isSubmitting ? (
-                <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Initializing Reels...
-                </>
-              ) : (
-                'Create Localization Project'
-              )}
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-apple-gray-100 dark:border-darkroom-border">
+            {!canCreate ? (
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 shrink-0" />
+                <span>Director or Producer role required ({user?.name || 'Guest'} restricted)</span>
+              </span>
+            ) : <div />}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="rounded-xl px-4 py-2 text-xs font-semibold text-apple-gray-600 hover:bg-apple-gray-100 dark:text-apple-gray-300 dark:hover:bg-darkroom-elevated transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting || !canCreate}
+                className="inline-flex items-center gap-2 rounded-xl bg-apple-blue px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-apple-blue-hover active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Initializing Reels...
+                  </>
+                ) : (
+                  'Create Localization Project'
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>

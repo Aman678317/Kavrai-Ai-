@@ -144,4 +144,52 @@ dist/assets/index-TQnb6ewI.js   245.71 kB │ gzip: 71.02 kB
 ```
 
 ---
+
+## 7. Studio Authentication & Role-Based Access Control (RBAC)
+
+### 7.1 Architectural Inventory
+| File Path | Component / Feature |
+| :--- | :--- |
+| `apps/web/src/types/auth.ts` | Studio Roles (`DIRECTOR`, `SOUND_SUPERVISOR`, `QC_AUDITOR`, `STUDIO_PRODUCER`), Permission mappings, labels, and pre-seeded personas. |
+| `apps/web/src/lib/authContext.tsx` | Global `AuthProvider` and `useAuth()` hook with persistent session management and in-memory test fallback. |
+| `apps/web/src/components/auth/AuthModal.tsx` | Apple Pro glassmorphism modal with 1-click persona switching and studio credentials login (JWT simulated). |
+| `apps/web/src/components/common/Header.tsx` | Active persona pill, color-coded role badge, and 1-click `AuthModal` trigger. |
+| `apps/web/src/components/projects/CreateProjectModal.tsx` | Role-gated project creation (enforcing Director/Producer authority). |
+| `apps/web/src/pages/ProjectDetailPage.tsx` | Contextual permission enforcement: C2PA Theatrical Seal restricted to Lead Director, Sound Supervisor controls in Voice tab, active reviewer tracking. |
+| `apps/web/src/test/auth.test.ts` | Unit tests for RBAC permissions, persona integrity, and role styling metadata. |
+
+### 7.2 Test Results (All 18 Tests Passing)
+```
+> @kavrai/web@1.0.0 test
+> vitest run
+
+ RUN  v2.1.9 C:/Users/acer/3D Objects/kavrai AI/apps/web
+
+ ✓ src/test/timecode.test.ts (6 tests) 9ms
+ ✓ src/test/auth.test.ts (6 tests) 15ms
+ ✓ src/test/api.test.ts (6 tests) 2184ms
+
+ Test Files  3 passed (3)
+      Tests  18 passed (18)
+   Duration  3.55s
+```
+
+### 7.3 Production Build Verification
+```
+> @kavrai/web@1.0.0 build
+> tsc -b && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1584 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.04 kB │ gzip:  0.62 kB
+dist/assets/index-CPu1xG6D.css   40.81 kB │ gzip:  7.31 kB
+dist/assets/index-CpJwCOfI.js   263.76 kB │ gzip: 74.95 kB
+✓ built in 5.42s
+```
+
+---
 *End of Kavrai AI Implementation Log.*
+

@@ -9,9 +9,13 @@ import {
   Play,
   FileCheck2,
   ShieldCheck,
+  Lock,
+  Sliders,
+  UserCheck,
 } from 'lucide-react';
 import { FilmProject, Reel, Shot } from '../types/project';
 import { projectsApi } from '../lib/api';
+import { useAuth } from '../lib/authContext';
 import { CinemaPlayerModal } from '../components/player/CinemaPlayerModal';
 
 const MOCK_SHOTS: Shot[] = [
@@ -68,6 +72,9 @@ export const ProjectDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'REELS' | 'TRANSCREATION' | 'VOICE' | 'DELIVERY'>('REELS');
   const [selectedReel, setSelectedReel] = useState<Reel | null>(null);
   const [isPlayerOpen, setIsPlayerOpen] = useState<boolean>(false);
+  const [c2paSigned, setC2paSigned] = useState<boolean>(false);
+  const [loudnessCalibrated, setLoudnessCalibrated] = useState<boolean>(false);
+  const { user, hasPermission } = useAuth();
 
   useEffect(() => {
     const loadProject = async () => {
@@ -190,6 +197,16 @@ export const ProjectDetailPage: React.FC = () => {
                     </span>
                   ))}
                 </div>
+
+                {/* Active Reviewer Role Pill */}
+                {user && (
+                  <div className="mt-3.5 inline-flex items-center gap-2 rounded-lg border border-apple-gray-200/60 bg-apple-surface/60 px-2.5 py-1 text-[11px] text-apple-gray-600 dark:border-darkroom-border/60 dark:bg-darkroom-elevated/60 dark:text-apple-gray-300">
+                    <UserCheck className="h-3.5 w-3.5 text-apple-blue dark:text-blue-400" />
+                    <span>
+                      Reviewing as: <strong className="font-semibold text-apple-gray-900 dark:text-white">{user.name}</strong> ({user.title})
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -415,9 +432,36 @@ export const ProjectDetailPage: React.FC = () => {
               </div>
               <div className="rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-4 dark:border-darkroom-border dark:bg-darkroom-elevated">
                 <span className="text-apple-gray-500">Integrated Loudness</span>
-                <div className="text-sm font-bold text-apple-gray-900 dark:text-white mt-1">-24.1 LKFS</div>
-                <span className="text-emerald-600 text-[11px] font-semibold">Within &plusmn;0.5 dB Tolerance</span>
+                <div className="text-sm font-bold text-apple-gray-900 dark:text-white mt-1">
+                  {loudnessCalibrated ? '-24.0 LKFS (Conformed)' : '-24.1 LKFS'}
+                </div>
+                <span className="text-emerald-600 text-[11px] font-semibold">Within ±0.5 dB Tolerance</span>
               </div>
+            </div>
+
+            {/* Audio Supervisor Action Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-apple-gray-200/60 dark:border-darkroom-border/60">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-apple-gray-500">Sound Engineering Clearance:</span>
+                {hasPermission('ADJUST_AUDIO_STEMS') ? (
+                  <span className="rounded-md bg-cinema-purple/15 px-2 py-0.5 text-[10px] font-bold text-cinema-purple border border-cinema-purple/30 dark:bg-purple-500/20 dark:text-purple-400">
+                    Sound Supervisor Authorized
+                  </span>
+                ) : (
+                  <span className="rounded-md bg-apple-gray-200 dark:bg-darkroom-elevated px-2 py-0.5 text-[10px] font-medium text-apple-gray-500">
+                    Read-Only (Sound Supervisor or Director Role Required)
+                  </span>
+                )}
+              </div>
+              {hasPermission('ADJUST_AUDIO_STEMS') && (
+                <button
+                  onClick={() => setLoudnessCalibrated((prev) => !prev)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cinema-purple px-3.5 py-2 text-xs font-semibold text-white hover:bg-purple-700 active:scale-95 transition-all"
+                >
+                  <Sliders className="h-3.5 w-3.5" />
+                  <span>{loudnessCalibrated ? 'Reset Loudness Trim' : 'Re-Calibrate LKFS Conformance'}</span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -437,6 +481,41 @@ export const ProjectDetailPage: React.FC = () => {
                 </p>
               </div>
             </div>
+
+            {/* Role-Gated Master Sign-Off Control */}
+            {hasPermission('SIGN_C2PA_MASTER') ? (
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-apple-gray-50 dark:bg-darkroom-elevated p-4 rounded-xl border border-apple-gray-200 dark:border-darkroom-border">
+                <div>
+                  <span className="text-xs font-bold text-apple-gray-900 dark:text-white">
+                    Supervising Director Authorization
+                  </span>
+                  <p className="text-[11px] text-apple-gray-500 dark:text-apple-gray-400">
+                    Apply immutable theatrical seal for SMPTE ST 2067-2 IMF / DCI packaging.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setC2paSigned((prev) => !prev)}
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold text-white shadow-glow-blue transition-all ${
+                    c2paSigned
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-apple-blue hover:bg-apple-blue-hover active:scale-95'
+                  }`}
+                >
+                  <FileCheck2 className="h-4 w-4" />
+                  <span>{c2paSigned ? 'C2PA Theatrical Seal Applied (DCP Ready)' : 'Authorize & Sign C2PA Master Manifest'}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-400">
+                <Lock className="h-5 w-5 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">Director Sign-Off Required for Theatrical C2PA Seal</span>
+                  <p className="text-[11px] mt-0.5 text-amber-600 dark:text-amber-300">
+                    Current active persona: <strong className="font-semibold">{user?.name || 'Guest'}</strong> ({user?.title || 'Unauthenticated'}). Only the Supervising Director role possesses cryptographic authority to seal actor likeness and voice synthesis distribution masters.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
