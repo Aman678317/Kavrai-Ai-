@@ -10,6 +10,10 @@ import {
   ToneProfile,
   ValidationStatus,
   TranscreationJob,
+  CharacterVoiceProfile,
+  DubbedAudioLine,
+  DubbingJob,
+  EmotionProfile,
 } from '../types/project';
 import { DEMO_PROJECTS, SUPPORTED_LANGUAGES } from './demoData';
 import { MediaMetadata, MultipartUploadSession, UploadPart } from '../types/ingest';
@@ -695,5 +699,225 @@ export const transcreationApi = {
     };
   },
 };
+
+export const dubbingApi = {
+  async getVoiceProfiles(): Promise<CharacterVoiceProfile[]> {
+    await new Promise((r) => setTimeout(r, 80));
+    return [
+      {
+        characterId: 'char_elena',
+        characterName: 'Commander Elena Vance',
+        performerName: 'Elena Vance (Lead Voice Talent)',
+        authorizationConsentId: 'SAG-AFTRA-EV-2026-9941',
+        isAuthorized: true,
+        primaryModel: 'CosyVoice 2 (Apache 2.0)',
+        licenseType: 'APACHE_2_0',
+        pitchScale: 1.05,
+        energyScale: 1.1,
+        referenceAudioUrl: 's3://cinema-vault-voices/elena_vance_clean_master.wav',
+        languageTimbre: 'es-ES',
+      },
+      {
+        characterId: 'char_kaelen',
+        characterName: 'Chief Engineer Kaelen',
+        performerName: 'Kaelen Scott (Senior Voice Talent)',
+        authorizationConsentId: 'SAG-AFTRA-KS-2026-4412',
+        isAuthorized: true,
+        primaryModel: 'StyleTTS 2 (MIT)',
+        licenseType: 'MIT_WITH_CONSENT',
+        pitchScale: 0.95,
+        energyScale: 1.15,
+        referenceAudioUrl: 's3://cinema-vault-voices/kaelen_scott_clean_master.wav',
+        languageTimbre: 'es-ES',
+      },
+      {
+        characterId: 'char_aura',
+        characterName: 'AI Interface Aura',
+        performerName: 'Aura Synthetic Vocal Architecture',
+        authorizationConsentId: 'SYNTH-AI-AU-2026-0001',
+        isAuthorized: true,
+        primaryModel: 'CosyVoice 2 (Apache 2.0)',
+        licenseType: 'APACHE_2_0',
+        pitchScale: 1.0,
+        energyScale: 0.98,
+        referenceAudioUrl: 's3://cinema-vault-voices/aura_interface_master.wav',
+        languageTimbre: 'es-ES',
+      },
+    ];
+  },
+
+  async triggerDubbingSynthesis(
+    reelId: string,
+    options: {
+      speakingRate?: number;
+      defaultEmotion?: EmotionProfile;
+      targetLanguage?: string;
+      simulateUncertifiedVoice?: boolean;
+    } = {},
+    onProgress?: (stage: string, percent: number) => void
+  ): Promise<DubbingJob> {
+    const rate = options.speakingRate ?? 1.0;
+    const emotion = options.defaultEmotion ?? 'URGENT_COMMAND';
+    const lang = options.targetLanguage ?? 'es-ES';
+
+    onProgress?.('Verifying SAG-AFTRA Actor Consent Ledgers & Licensing...', 20);
+    await new Promise((r) => setTimeout(r, 150));
+
+    if (options.simulateUncertifiedVoice) {
+      throw new Error(
+        "Voice authorization failed: SAG-AFTRA consent token for character 'char_unauthorized' is invalid or expired."
+      );
+    }
+
+    onProgress?.('Generating Expressive Prosody & Neural Synthesis (CosyVoice 2 / StyleTTS 2)...', 50);
+    await new Promise((r) => setTimeout(r, 180));
+
+    onProgress?.('Evaluating Duration Alignment & Applying Dynamic WSOLA Time-Stretch...', 75);
+    await new Promise((r) => setTimeout(r, 150));
+
+    onProgress?.('Conforming Broadcast Loudness (ITU-R BS.1770-4 -24.0 LKFS)...', 90);
+    await new Promise((r) => setTimeout(r, 120));
+
+    const audioLines: DubbedAudioLine[] = [
+      {
+        id: `dub-audio-${reelId}-001`,
+        shotId: 'shot-101',
+        characterId: 'char_elena',
+        characterName: 'Commander Elena Vance',
+        timecodeIn: '01:00:01:06',
+        timecodeOut: '01:00:04:18',
+        targetDurationSeconds: 3.5,
+        actualDurationSeconds: 3.42,
+        conformedDurationSeconds: 3.42,
+        durationDeltaMs: -80,
+        wsolaApplied: false,
+        timeStretchRatio: 1.0,
+        loudnessLkfs: -24.0,
+        truePeakDbtp: -1.0,
+        snrDb: 29.4,
+        isHumanAudio: false,
+        audioUrl: `s3://cinema-vault-dubbing/cosyvoice2/elena_trayectoria_orbital.wav`,
+        conformanceStatus: 'CONFORMED',
+        licenseType: 'APACHE_2_0',
+        emotion,
+        translatedText: 'Trayectoria orbital lista. Vector de reentrada iniciado.',
+      },
+      {
+        id: `dub-audio-${reelId}-002`,
+        shotId: 'shot-102',
+        characterId: 'char_kaelen',
+        characterName: 'Chief Engineer Kaelen',
+        timecodeIn: '01:00:06:00',
+        timecodeOut: '01:00:10:12',
+        targetDurationSeconds: 4.5,
+        actualDurationSeconds: 4.85,
+        conformedDurationSeconds: 4.5,
+        durationDeltaMs: 350,
+        wsolaApplied: true,
+        timeStretchRatio: 0.928,
+        loudnessLkfs: -24.0,
+        truePeakDbtp: -1.0,
+        snrDb: 28.8,
+        isHumanAudio: false,
+        audioUrl: `s3://cinema-vault-dubbing/styletts2/kaelen_escudos_noventa.wav`,
+        conformanceStatus: 'CONFORMED',
+        licenseType: 'MIT_WITH_CONSENT',
+        emotion,
+        translatedText: 'Escudos al noventa y dos por ciento. Propulsores sincronizados.',
+      },
+      {
+        id: `dub-audio-${reelId}-003`,
+        shotId: 'shot-103',
+        characterId: 'char_elena',
+        characterName: 'Commander Elena Vance',
+        timecodeIn: '01:00:12:08',
+        timecodeOut: '01:00:16:04',
+        targetDurationSeconds: 3.83,
+        actualDurationSeconds: 3.8,
+        conformedDurationSeconds: 3.8,
+        durationDeltaMs: -30,
+        wsolaApplied: false,
+        timeStretchRatio: 1.0,
+        loudnessLkfs: -24.0,
+        truePeakDbtp: -1.0,
+        snrDb: 29.1,
+        isHumanAudio: false,
+        audioUrl: `s3://cinema-vault-dubbing/cosyvoice2/elena_firma_anomala.wav`,
+        conformanceStatus: 'CONFORMED',
+        licenseType: 'APACHE_2_0',
+        emotion,
+        translatedText: 'Firma anómala de radiación que cruza el mamparo de proa.',
+      },
+    ];
+
+    onProgress?.('Reel Dubbing & Audio Conformance complete.', 100);
+
+    return {
+      jobId: `job-dub-${reelId}-${Date.now().toString().slice(-4)}`,
+      projectId: 'proj-001',
+      reelId,
+      status: 'COMPLETED',
+      stage: 'COMPLETED',
+      progressPercent: 100,
+      targetLanguage: lang,
+      audioLines,
+      totalDurationSeconds: 11.72,
+      averageLoudnessLkfs: -24.0,
+      averageSnrDb: 29.1,
+      humanTakesCount: 0,
+    };
+  },
+
+  async uploadHumanAudioTake(
+    lineId: string,
+    file: { name: string; size: number; durationSeconds?: number },
+    onProgress?: (stage: string, percent: number) => void
+  ): Promise<DubbedAudioLine> {
+    onProgress?.('Validating 48 kHz 24-bit PCM Broadcast Audio Take...', 25);
+    await new Promise((r) => setTimeout(r, 120));
+
+    onProgress?.('Running SNR and Acoustic Quality Analysis...', 60);
+    await new Promise((r) => setTimeout(r, 120));
+
+    const duration = file.durationSeconds ?? 3.55;
+    const targetDuration = 3.5;
+    const deltaMs = Math.round((duration - targetDuration) * 1000);
+    const driftPercent = (Math.abs(duration - targetDuration) / targetDuration) * 100;
+    const wsola = driftPercent > 5.0 && driftPercent <= 15.0;
+
+    onProgress?.('Applying ITU-R BS.1770-4 (-24.0 LKFS) Normalization...', 90);
+    await new Promise((r) => setTimeout(r, 100));
+
+    onProgress?.('Human ADR Take Conformed and Attached.', 100);
+
+    return {
+      id: `dub-human-${lineId}`,
+      characterId: 'char_elena',
+      characterName: 'Commander Elena Vance',
+      timecodeIn: '01:00:01:06',
+      timecodeOut: '01:00:04:18',
+      targetDurationSeconds: targetDuration,
+      actualDurationSeconds: duration,
+      conformedDurationSeconds: wsola ? targetDuration : duration,
+      durationDeltaMs: deltaMs,
+      wsolaApplied: wsola,
+      timeStretchRatio: wsola ? Number((targetDuration / duration).toFixed(3)) : 1.0,
+      loudnessLkfs: -24.0,
+      truePeakDbtp: -1.0,
+      snrDb: 31.2,
+      isHumanAudio: true,
+      audioUrl: `s3://cinema-vault-dubbing/human_adr/${file.name}`,
+      conformanceStatus: driftPercent > 15.0 ? 'NEEDS_PACING_ADJUSTMENT' : 'CONFORMED',
+      licenseType: 'HUMAN_PERFORMER',
+      emotion: 'NEUTRAL',
+      translatedText: '[Human Performer ADR Studio Recording]',
+      pacingWarning:
+        driftPercent > 15.0
+          ? `Speech duration is ${driftPercent.toFixed(1)}% divergent from target window.`
+          : undefined,
+    };
+  },
+};
+
 
 

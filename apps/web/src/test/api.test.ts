@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { projectsApi, speechProcessingApi, transcreationApi } from '../lib/api';
+import { projectsApi, speechProcessingApi, transcreationApi, dubbingApi } from '../lib/api';
 
 describe('Cinema Projects API & State Engine', () => {
   beforeEach(async () => {
@@ -200,4 +200,67 @@ describe('Multilingual Dialogue Transcreation & Dubbing Script API', () => {
     expect(updated.validationStatus).toBe('VALIDATED');
   });
 });
+
+describe('Modular Dubbing & Voice Synthesis Engine API', () => {
+  it('retrieves certified character voice profiles with SAG-AFTRA authorization', async () => {
+    const profiles = await dubbingApi.getVoiceProfiles();
+    expect(profiles).toBeDefined();
+    expect(profiles.length).toBeGreaterThanOrEqual(3);
+
+    const elena = profiles.find((p) => p.characterId === 'char_elena');
+    expect(elena).toBeDefined();
+    expect(elena?.isAuthorized).toBe(true);
+    expect(elena?.authorizationConsentId).toBe('SAG-AFTRA-EV-2026-9941');
+    expect(elena?.primaryModel).toContain('CosyVoice 2');
+    expect(elena?.licenseType).toBe('APACHE_2_0');
+  });
+
+  it('synthesizes reel dubbing audio with WSOLA duration alignment and -24.0 LKFS loudness', async () => {
+    const job = await dubbingApi.triggerDubbingSynthesis('reel_test_01', {
+      speakingRate: 1.0,
+      defaultEmotion: 'URGENT_COMMAND',
+      targetLanguage: 'es-ES',
+    });
+
+    expect(job).toBeDefined();
+    expect(job.status).toBe('COMPLETED');
+    expect(job.stage).toBe('COMPLETED');
+    expect(job.progressPercent).toBe(100);
+    expect(job.audioLines.length).toBe(3);
+
+    // Verify broadcast loudness & peak constraints
+    expect(job.averageLoudnessLkfs).toBe(-24.0);
+    expect(job.averageSnrDb).toBeGreaterThanOrEqual(25.0);
+
+    // Verify WSOLA time-stretch metadata
+    const lineWithStretch = job.audioLines.find((l) => l.wsolaApplied);
+    expect(lineWithStretch).toBeDefined();
+    expect(lineWithStretch?.conformedDurationSeconds).toBe(lineWithStretch?.targetDurationSeconds);
+    expect(lineWithStretch?.loudnessLkfs).toBe(-24.0);
+  });
+
+  it('enforces closed-gate security on uncertified voice models without SAG-AFTRA consent', async () => {
+    await expect(
+      dubbingApi.triggerDubbingSynthesis('reel_security_test', {
+        simulateUncertifiedVoice: true,
+      })
+    ).rejects.toThrow('Voice authorization failed: SAG-AFTRA consent token');
+  });
+
+  it('ingests and conforms human ADR audio takes with duration and quality validation', async () => {
+    const humanLine = await dubbingApi.uploadHumanAudioTake('dub-audio-001', {
+      name: 'human_elena_take01.wav',
+      size: 1024 * 1024 * 3.5,
+      durationSeconds: 3.55,
+    });
+
+    expect(humanLine).toBeDefined();
+    expect(humanLine.isHumanAudio).toBe(true);
+    expect(humanLine.licenseType).toBe('HUMAN_PERFORMER');
+    expect(humanLine.loudnessLkfs).toBe(-24.0);
+    expect(humanLine.snrDb).toBeGreaterThanOrEqual(25.0);
+    expect(humanLine.conformanceStatus).toBe('CONFORMED');
+  });
+});
+
 

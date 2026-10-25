@@ -221,3 +221,81 @@ export interface TranscreationJob {
   providerUsed: string;
   error?: string;
 }
+
+export type EmotionProfile =
+  | 'NEUTRAL'
+  | 'URGENT_COMMAND'
+  | 'INTIMATE_WHISPER'
+  | 'SARCASTIC_WIT'
+  | 'TERRIFIED'
+  | 'HEROIC'
+  | 'SOMBER';
+
+export type VoiceLicenseType =
+  | 'APACHE_2_0'
+  | 'MIT_WITH_CONSENT'
+  | 'COMMERCIAL_ENTERPRISE'
+  | 'HUMAN_PERFORMER';
+
+export interface CharacterVoiceProfile {
+  characterId: string;
+  characterName: string;
+  performerName: string;
+  authorizationConsentId: string;
+  isAuthorized: boolean;
+  primaryModel: string;
+  licenseType: VoiceLicenseType;
+  pitchScale: number;
+  energyScale: number;
+  referenceAudioUrl: string;
+  languageTimbre: string;
+}
+
+export interface DubbedAudioLine {
+  id: string;
+  shotId?: string;
+  characterId: string;
+  characterName: string;
+  timecodeIn: string;
+  timecodeOut: string;
+  targetDurationSeconds: number;
+  actualDurationSeconds: number;
+  conformedDurationSeconds: number;
+  durationDeltaMs: number;
+  wsolaApplied: boolean;
+  timeStretchRatio: number;
+  loudnessLkfs: number;
+  truePeakDbtp: number;
+  snrDb: number;
+  isHumanAudio: boolean;
+  audioUrl: string;
+  conformanceStatus: 'CONFORMED' | 'NEEDS_PACING_ADJUSTMENT' | 'FAILED';
+  licenseType: VoiceLicenseType;
+  emotion: EmotionProfile;
+  translatedText: string;
+  pacingWarning?: string;
+}
+
+export interface DubbingJob {
+  jobId: string;
+  projectId: string;
+  reelId: string;
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  stage:
+    | 'QUEUED'
+    | 'CONSENT_VERIFICATION'
+    | 'PROSODY_EMOTION_SYNTHESIS'
+    | 'DURATION_QUALITY_CONFORMANCE'
+    | 'STEM_CONFORMANCE'
+    | 'COMPLETED'
+    | 'FAILED';
+  progressPercent: number;
+  targetLanguage: string;
+  audioLines: DubbedAudioLine[];
+  totalDurationSeconds: number;
+  averageLoudnessLkfs: number;
+  averageSnrDb: number;
+  humanTakesCount: number;
+  error?: string;
+}
+

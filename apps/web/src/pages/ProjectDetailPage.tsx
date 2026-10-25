@@ -25,6 +25,9 @@ import {
   RefreshCw,
   AlertOctagon,
   MessageSquare,
+  Pause,
+  Radio,
+  FileAudio,
 } from 'lucide-react';
 import {
   FilmProject,
@@ -34,12 +37,16 @@ import {
   DubbingScriptLine,
   ToneProfile,
   ValidationStatus,
+  CharacterVoiceProfile,
+  DubbedAudioLine,
+  EmotionProfile,
 } from '../types/project';
 import {
   projectsApi,
   videoAnalysisApi,
   speechProcessingApi,
   transcreationApi,
+  dubbingApi,
 } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { CinemaPlayerModal } from '../components/player/CinemaPlayerModal';
@@ -300,6 +307,78 @@ const MOCK_SHOTS: Shot[] = [
   },
 ];
 
+const MOCK_DUBBED_AUDIO_LINES: DubbedAudioLine[] = [
+  {
+    id: 'dub-audio-init-001',
+    shotId: 'shot-101',
+    characterId: 'char_elena',
+    characterName: 'Commander Elena Vance',
+    timecodeIn: '01:00:01:06',
+    timecodeOut: '01:00:04:18',
+    targetDurationSeconds: 3.5,
+    actualDurationSeconds: 3.42,
+    conformedDurationSeconds: 3.42,
+    durationDeltaMs: -80,
+    wsolaApplied: false,
+    timeStretchRatio: 1.0,
+    loudnessLkfs: -24.0,
+    truePeakDbtp: -1.0,
+    snrDb: 29.4,
+    isHumanAudio: false,
+    audioUrl: 's3://cinema-vault-dubbing/cosyvoice2/elena_trayectoria_orbital.wav',
+    conformanceStatus: 'CONFORMED',
+    licenseType: 'APACHE_2_0',
+    emotion: 'URGENT_COMMAND',
+    translatedText: 'Trayectoria orbital lista. Vector de reentrada iniciado.',
+  },
+  {
+    id: 'dub-audio-init-002',
+    shotId: 'shot-102',
+    characterId: 'char_kaelen',
+    characterName: 'Chief Engineer Kaelen',
+    timecodeIn: '01:00:06:00',
+    timecodeOut: '01:00:10:12',
+    targetDurationSeconds: 4.5,
+    actualDurationSeconds: 4.85,
+    conformedDurationSeconds: 4.5,
+    durationDeltaMs: 350,
+    wsolaApplied: true,
+    timeStretchRatio: 0.928,
+    loudnessLkfs: -24.0,
+    truePeakDbtp: -1.0,
+    snrDb: 28.8,
+    isHumanAudio: false,
+    audioUrl: 's3://cinema-vault-dubbing/styletts2/kaelen_escudos_noventa.wav',
+    conformanceStatus: 'CONFORMED',
+    licenseType: 'MIT_WITH_CONSENT',
+    emotion: 'URGENT_COMMAND',
+    translatedText: 'Escudos al noventa y dos por ciento. Propulsores sincronizados.',
+  },
+  {
+    id: 'dub-audio-init-003',
+    shotId: 'shot-103',
+    characterId: 'char_elena',
+    characterName: 'Commander Elena Vance',
+    timecodeIn: '01:00:12:08',
+    timecodeOut: '01:00:16:04',
+    targetDurationSeconds: 3.83,
+    actualDurationSeconds: 3.8,
+    conformedDurationSeconds: 3.8,
+    durationDeltaMs: -30,
+    wsolaApplied: false,
+    timeStretchRatio: 1.0,
+    loudnessLkfs: -24.0,
+    truePeakDbtp: -1.0,
+    snrDb: 29.1,
+    isHumanAudio: false,
+    audioUrl: 's3://cinema-vault-dubbing/cosyvoice2/elena_firma_anomala.wav',
+    conformanceStatus: 'CONFORMED',
+    licenseType: 'APACHE_2_0',
+    emotion: 'URGENT_COMMAND',
+    translatedText: 'Firma anómala de radiación que cruza el mamparo de proa.',
+  },
+];
+
 export const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<FilmProject | null>(null);
@@ -330,6 +409,19 @@ export const ProjectDetailPage: React.FC = () => {
   const [simulateProviderFailure, setSimulateProviderFailure] = useState<boolean>(false);
   const [simulateProviderRetry, setSimulateProviderRetry] = useState<boolean>(false);
   const [transcreationNotification, setTranscreationNotification] = useState<string | null>(null);
+
+  // Dubbing & Voice Synthesis State
+  const [dubbedAudioLines, setDubbedAudioLines] = useState<DubbedAudioLine[]>(MOCK_DUBBED_AUDIO_LINES);
+  const [voiceProfiles, setVoiceProfiles] = useState<CharacterVoiceProfile[]>([]);
+  const [isSynthesizingDubbing, setIsSynthesizingDubbing] = useState<boolean>(false);
+  const [dubbingStage, setDubbingStage] = useState<string>('');
+  const [dubbingProgress, setDubbingProgress] = useState<number>(0);
+  const [speakingRate, setSpeakingRate] = useState<number>(1.0);
+  const [defaultEmotion, setDefaultEmotion] = useState<EmotionProfile>('URGENT_COMMAND');
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [simulateUncertifiedVoice, setSimulateUncertifiedVoice] = useState<boolean>(false);
+  const [dubbingNotification, setDubbingNotification] = useState<string | null>(null);
+
   const { user, hasPermission } = useAuth();
 
   useEffect(() => {
@@ -342,6 +434,8 @@ export const ProjectDetailPage: React.FC = () => {
         if (data && data.reels.length > 0) {
           setSelectedReel(data.reels[0]);
         }
+        const voices = await dubbingApi.getVoiceProfiles();
+        setVoiceProfiles(voices);
       } catch (e) {
         console.error('Failed to load project details:', e);
       } finally {
@@ -1263,60 +1357,432 @@ export const ProjectDetailPage: React.FC = () => {
 
 
 
-        {/* Tab 3: Voice & Stems */}
+        {/* Tab 3: Voice & Stems & Dubbing Studio */}
         {activeTab === 'VOICE' && (
-          <div className="rounded-2xl border border-apple-gray-200 bg-apple-surface p-6 shadow-apple-sm dark:border-darkroom-border dark:bg-darkroom-surface space-y-6">
-            <div>
-              <h3 className="text-sm font-bold text-apple-gray-900 dark:text-white mb-1">
-                Audio Separation & Loudness Normalization
-              </h3>
-              <p className="text-xs text-apple-gray-500">
-                Hybrid Demucs v4 48 kHz stem isolation and ITU-R BS.1770-4 (-24.0 LKFS) broadcast loudness conform.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
-              <div className="rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-4 dark:border-darkroom-border dark:bg-darkroom-elevated">
-                <span className="text-apple-gray-500">Dialogue Stem</span>
-                <div className="text-sm font-bold text-apple-gray-900 dark:text-white mt-1">vocals.wav</div>
-                <span className="text-emerald-600 text-[11px] font-semibold">Clean Isolation (SDR 12.4 dB)</span>
-              </div>
-              <div className="rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-4 dark:border-darkroom-border dark:bg-darkroom-elevated">
-                <span className="text-apple-gray-500">Music & Effects (M&E)</span>
-                <div className="text-sm font-bold text-apple-gray-900 dark:text-white mt-1">m_and_e.wav</div>
-                <span className="text-cinema-green text-[11px] font-semibold">100% Phase Preserved</span>
-              </div>
-              <div className="rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-4 dark:border-darkroom-border dark:bg-darkroom-elevated">
-                <span className="text-apple-gray-500">Integrated Loudness</span>
-                <div className="text-sm font-bold text-apple-gray-900 dark:text-white mt-1">
-                  {loudnessCalibrated ? '-24.0 LKFS (Conformed)' : '-24.1 LKFS'}
+          <div className="space-y-6">
+            {/* Dubbing Engine Overview & SAG-AFTRA Cast Roster */}
+            <div className="rounded-2xl border border-apple-gray-200 bg-apple-surface p-6 shadow-apple-sm dark:border-darkroom-border dark:bg-darkroom-surface space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-cinema-purple/10 px-2 py-0.5 text-[10px] font-bold text-cinema-purple border border-cinema-purple/20">
+                      VAANI NEURAL DUBBING
+                    </span>
+                    <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      SAG-AFTRA LEDGER VERIFIED
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-apple-gray-900 dark:text-white mt-1.5">
+                    Theatrical Dubbing & Voice Synthesis Studio
+                  </h3>
+                  <p className="text-xs text-apple-gray-500 mt-0.5">
+                    Licensed cross-lingual speech synthesis (CosyVoice 2 Apache 2.0 / StyleTTS 2 MIT), WSOLA dynamic duration alignment, and human ADR take conformance.
+                  </p>
                 </div>
-                <span className="text-emerald-600 text-[11px] font-semibold">Within ±0.5 dB Tolerance</span>
+
+                {/* Synthesis Action Bar */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-1.5 rounded-xl border border-apple-gray-200 bg-apple-gray-50 px-2.5 py-1.5 dark:border-darkroom-border dark:bg-darkroom-elevated text-xs">
+                    <span className="text-[11px] text-apple-gray-500">Rate:</span>
+                    <input
+                      type="range"
+                      min="0.8"
+                      max="1.2"
+                      step="0.05"
+                      value={speakingRate}
+                      onChange={(e) => setSpeakingRate(parseFloat(e.target.value))}
+                      className="w-16 accent-apple-blue cursor-pointer"
+                    />
+                    <span className="font-mono text-[11px] font-semibold text-apple-gray-700 dark:text-apple-gray-300 w-10 text-right">
+                      {speakingRate.toFixed(2)}x
+                    </span>
+                  </div>
+
+                  <select
+                    value={defaultEmotion}
+                    onChange={(e) => setDefaultEmotion(e.target.value as EmotionProfile)}
+                    className="rounded-xl border border-apple-gray-200 bg-apple-gray-50 px-3 py-1.5 text-xs font-medium text-apple-gray-700 dark:border-darkroom-border dark:bg-darkroom-elevated dark:text-apple-gray-300 focus:outline-none focus:ring-2 focus:ring-apple-blue"
+                  >
+                    <option value="URGENT_COMMAND">Urgent Command</option>
+                    <option value="INTIMATE_WHISPER">Intimate Whisper</option>
+                    <option value="SARCASTIC_WIT">Sarcastic Wit</option>
+                    <option value="HEROIC">Heroic Delivery</option>
+                    <option value="NEUTRAL">Neutral Dialogue</option>
+                  </select>
+
+                  <button
+                    onClick={async () => {
+                      if (!selectedReel) return;
+                      setIsSynthesizingDubbing(true);
+                      setDubbingNotification(null);
+                      try {
+                        const res = await dubbingApi.triggerDubbingSynthesis(
+                          selectedReel.id,
+                          {
+                            speakingRate,
+                            defaultEmotion,
+                            targetLanguage: selectedLangCode,
+                            simulateUncertifiedVoice,
+                          },
+                          (stage, pct) => {
+                            setDubbingStage(stage);
+                            setDubbingProgress(pct);
+                          }
+                        );
+                        setDubbedAudioLines(res.audioLines);
+                        setDubbingNotification(
+                          `Reel dubbing completed: ${res.audioLines.length} lines conformed to -24.0 LKFS (Average SNR: ${res.averageSnrDb} dB).`
+                        );
+                      } catch (err: any) {
+                        setDubbingNotification(`Dubbing Failed: ${err.message}`);
+                      } finally {
+                        setIsSynthesizingDubbing(false);
+                      }
+                    }}
+                    disabled={isSynthesizingDubbing}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cinema-purple to-apple-blue px-3.5 py-1.5 text-xs font-semibold text-white shadow-md hover:opacity-95 active:scale-95 disabled:opacity-50 transition-all"
+                  >
+                    {isSynthesizingDubbing ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    <span>{isSynthesizingDubbing ? 'Synthesizing...' : 'Synthesize Reel Dubbing'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Security Test Toggle & Notification Banner */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-apple-gray-500 hover:text-apple-gray-800 dark:hover:text-apple-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={simulateUncertifiedVoice}
+                    onChange={(e) => setSimulateUncertifiedVoice(e.target.checked)}
+                    className="rounded border-apple-gray-300 text-cinema-purple focus:ring-cinema-purple/30"
+                  />
+                  <span>Simulate Uncertified Voice Error (Security Closed-Gate Test)</span>
+                </label>
+
+                {dubbingNotification && (
+                  <div
+                    className={`rounded-xl px-3 py-1.5 text-xs font-medium border ${
+                      dubbingNotification.includes('Failed')
+                        ? 'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400'
+                        : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                    }`}
+                  >
+                    {dubbingNotification}
+                  </div>
+                )}
+              </div>
+
+              {/* Progress Ribbon */}
+              {isSynthesizingDubbing && (
+                <div className="rounded-xl border border-cinema-purple/20 bg-cinema-purple/5 p-4 dark:border-purple-500/20 dark:bg-purple-500/5 space-y-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-cinema-purple dark:text-purple-400 flex items-center gap-1.5">
+                      <Radio className="h-3.5 w-3.5 animate-pulse" />
+                      {dubbingStage}
+                    </span>
+                    <span className="font-mono text-cinema-purple dark:text-purple-400">{dubbingProgress}%</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-apple-gray-200 dark:bg-darkroom-elevated">
+                    <div
+                      className="h-full bg-gradient-to-r from-cinema-purple to-apple-blue transition-all duration-300"
+                      style={{ width: `${dubbingProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Character Voice Profiles (SAG-AFTRA Cast Ledger) */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-apple-gray-500 mb-3">
+                  Cast Voice Profiles & SAG-AFTRA Authorization
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {(voiceProfiles.length > 0 ? voiceProfiles : [
+                    {
+                      characterId: 'char_elena',
+                      characterName: 'Commander Elena Vance',
+                      performerName: 'Elena Vance (Lead Voice Talent)',
+                      authorizationConsentId: 'SAG-AFTRA-EV-2026-9941',
+                      isAuthorized: true,
+                      primaryModel: 'CosyVoice 2 (Apache 2.0)',
+                      licenseType: 'APACHE_2_0' as const,
+                      pitchScale: 1.05,
+                      energyScale: 1.1,
+                      referenceAudioUrl: 's3://cinema-vault-voices/elena_vance_clean_master.wav',
+                      languageTimbre: 'es-ES',
+                    },
+                    {
+                      characterId: 'char_kaelen',
+                      characterName: 'Chief Engineer Kaelen',
+                      performerName: 'Kaelen Scott (Senior Voice Talent)',
+                      authorizationConsentId: 'SAG-AFTRA-KS-2026-4412',
+                      isAuthorized: true,
+                      primaryModel: 'StyleTTS 2 (MIT)',
+                      licenseType: 'MIT_WITH_CONSENT' as const,
+                      pitchScale: 0.95,
+                      energyScale: 1.15,
+                      referenceAudioUrl: 's3://cinema-vault-voices/kaelen_scott_clean_master.wav',
+                      languageTimbre: 'es-ES',
+                    },
+                    {
+                      characterId: 'char_aura',
+                      characterName: 'AI Interface Aura',
+                      performerName: 'Aura Synthetic Vocal Architecture',
+                      authorizationConsentId: 'SYNTH-AI-AU-2026-0001',
+                      isAuthorized: true,
+                      primaryModel: 'CosyVoice 2 (Apache 2.0)',
+                      licenseType: 'APACHE_2_0' as const,
+                      pitchScale: 1.0,
+                      energyScale: 0.98,
+                      referenceAudioUrl: 's3://cinema-vault-voices/aura_interface_master.wav',
+                      languageTimbre: 'es-ES',
+                    },
+                  ]).map((profile) => (
+                    <div
+                      key={profile.characterId}
+                      className="rounded-xl border border-apple-gray-200 bg-apple-gray-50/70 p-3.5 dark:border-darkroom-border dark:bg-darkroom-elevated/70 space-y-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-apple-gray-900 dark:text-white">
+                          {profile.characterName}
+                        </span>
+                        <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          SAG-AFTRA VALID
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-apple-gray-500">
+                        Performer: <span className="font-medium text-apple-gray-700 dark:text-apple-300">{profile.performerName}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-apple-gray-200/50 dark:border-darkroom-border/50 text-[10px] text-apple-gray-400 font-mono">
+                        <span>{profile.primaryModel}</span>
+                        <span>F0 &times; {profile.pitchScale} | E &times; {profile.energyScale}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Line-by-Line Dubbed Dialogue Audio Inspector */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-apple-gray-500">
+                    Timestamped Dubbed Dialogue & Conformance ({dubbedAudioLines.length} Lines)
+                  </h4>
+                  <div className="flex items-center gap-3 text-[11px] font-mono text-apple-gray-500">
+                    <span>Target Loudness: <strong className="text-emerald-600">-24.0 LKFS</strong></span>
+                    <span>True Peak: <strong className="text-emerald-600">&le; -1.0 dBTP</strong></span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {dubbedAudioLines.map((line) => {
+                    const isPlaying = playingAudioId === line.id;
+                    return (
+                      <div
+                        key={line.id}
+                        className="rounded-xl border border-apple-gray-200 bg-apple-surface p-4 shadow-sm dark:border-darkroom-border dark:bg-darkroom-elevated transition-all"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 mb-2 border-b border-apple-gray-200/60 dark:border-darkroom-border/60">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-apple-blue/10 px-2 py-0.5 text-[11px] font-semibold text-apple-blue dark:bg-apple-blue/20 dark:text-blue-400">
+                              {line.characterName}
+                            </span>
+                            <span className="font-mono text-[11px] text-apple-gray-500">
+                              {line.timecodeIn} &rarr; {line.timecodeOut}
+                            </span>
+                            <span className="text-[11px] text-apple-gray-400">
+                              Target: {line.targetDurationSeconds}s | Conformed: {line.conformedDurationSeconds}s
+                            </span>
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-bold ${
+                                line.durationDeltaMs === 0
+                                  ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                                  : line.durationDeltaMs > 0
+                                  ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                                  : 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+                              }`}
+                            >
+                              &Delta; {line.durationDeltaMs > 0 ? `+${line.durationDeltaMs}` : line.durationDeltaMs} ms
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {line.wsolaApplied ? (
+                              <span className="rounded bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-cinema-purple border border-cinema-purple/30 dark:text-purple-400">
+                                WSOLA Stretched ({line.timeStretchRatio}x)
+                              </span>
+                            ) : (
+                              <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-500/30 dark:text-emerald-400">
+                                Duration Aligned
+                              </span>
+                            )}
+                            <span className="rounded bg-apple-gray-100 dark:bg-darkroom-surface px-2 py-0.5 text-[10px] font-mono text-apple-gray-600 dark:text-apple-gray-300">
+                              {line.loudnessLkfs} LKFS
+                            </span>
+                            <span className="rounded bg-apple-gray-100 dark:bg-darkroom-surface px-2 py-0.5 text-[10px] font-mono text-apple-gray-600 dark:text-apple-gray-300">
+                              SNR {line.snrDb} dB
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dialogue Body & Warning */}
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-apple-gray-900 dark:text-white leading-relaxed">
+                            {line.translatedText}
+                          </p>
+
+                          {line.pacingWarning && (
+                            <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                              <span>{line.pacingWarning}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Bar: Audio Preview & Human Take Ingest */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 mt-3 border-t border-apple-gray-200/50 dark:border-darkroom-border/50 text-xs">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                if (playingAudioId === line.id) {
+                                  setPlayingAudioId(null);
+                                } else {
+                                  setPlayingAudioId(line.id);
+                                  setTimeout(() => {
+                                    setPlayingAudioId((curr) => (curr === line.id ? null : curr));
+                                  }, 3000);
+                                }
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-apple-gray-100 dark:bg-darkroom-surface px-3 py-1 text-xs font-semibold text-apple-gray-800 dark:text-apple-gray-200 hover:bg-apple-gray-200 dark:hover:bg-darkroom-border active:scale-95 transition-all"
+                            >
+                              {isPlaying ? (
+                                <>
+                                  <Pause className="h-3.5 w-3.5 text-cinema-purple" />
+                                  <span>Playing...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="h-3.5 w-3.5 text-cinema-purple" />
+                                  <span>Preview Audio</span>
+                                </>
+                              )}
+                            </button>
+
+                            {isPlaying && (
+                              <div className="flex items-center gap-0.5 h-4">
+                                <span className="h-2 w-1 rounded-full bg-cinema-purple animate-pulse" />
+                                <span className="h-3.5 w-1 rounded-full bg-cinema-purple animate-bounce" />
+                                <span className="h-2.5 w-1 rounded-full bg-cinema-purple animate-pulse" />
+                                <span className="h-4 w-1 rounded-full bg-cinema-purple animate-bounce" />
+                                <span className="h-2 w-1 rounded-full bg-cinema-purple animate-pulse" />
+                              </div>
+                            )}
+
+                            <span className="font-mono text-[10px] text-apple-gray-400">
+                              {line.audioUrl}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {line.isHumanAudio && (
+                              <span className="rounded bg-cinema-purple/15 px-2 py-0.5 text-[10px] font-bold text-cinema-purple border border-cinema-purple/30">
+                                Human ADR Take Attached
+                              </span>
+                            )}
+                            <button
+                              onClick={async () => {
+                                try {
+                                  setDubbingNotification('Attaching and conforming human ADR take...');
+                                  const conformed = await dubbingApi.uploadHumanAudioTake(
+                                    line.id,
+                                    {
+                                      name: `human_${line.id}_take1.wav`,
+                                      size: 1024 * 1024 * 2.8,
+                                      durationSeconds: 3.48,
+                                    },
+                                    (stage) => setDubbingNotification(stage)
+                                  );
+                                  setDubbedAudioLines((prev) =>
+                                    prev.map((l) => (l.id === line.id ? conformed : l))
+                                  );
+                                  setDubbingNotification(`Human ADR Take conformed and attached to line.`);
+                                } catch (e: any) {
+                                  setDubbingNotification(`Failed to upload human take: ${e.message}`);
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-apple-gray-300 dark:border-darkroom-border px-2.5 py-1 text-[11px] font-medium text-apple-gray-700 dark:text-apple-gray-300 hover:bg-apple-gray-50 dark:hover:bg-darkroom-border transition-colors"
+                            >
+                              <FileAudio className="h-3.5 w-3.5 text-apple-gray-500" />
+                              <span>Upload Human ADR Take</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* Audio Supervisor Action Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-apple-gray-200/60 dark:border-darkroom-border/60">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-apple-gray-500">Sound Engineering Clearance:</span>
-                {hasPermission('ADJUST_AUDIO_STEMS') ? (
-                  <span className="rounded-md bg-cinema-purple/15 px-2 py-0.5 text-[10px] font-bold text-cinema-purple border border-cinema-purple/30 dark:bg-purple-500/20 dark:text-purple-400">
-                    Sound Supervisor Authorized
-                  </span>
-                ) : (
-                  <span className="rounded-md bg-apple-gray-200 dark:bg-darkroom-elevated px-2 py-0.5 text-[10px] font-medium text-apple-gray-500">
-                    Read-Only (Sound Supervisor or Director Role Required)
-                  </span>
+            {/* Preserved Stem Separation & Loudness Conformance Cards */}
+            <div className="rounded-2xl border border-apple-gray-200 bg-apple-surface p-6 shadow-apple-sm dark:border-darkroom-border dark:bg-darkroom-surface space-y-6">
+              <div>
+                <h3 className="text-sm font-bold text-apple-gray-900 dark:text-white mb-1">
+                  Audio Stem Separation & Loudness Normalization
+                </h3>
+                <p className="text-xs text-apple-gray-500">
+                  Hybrid Demucs v4 48 kHz stem isolation and ITU-R BS.1770-4 (-24.0 LKFS) broadcast loudness conform.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
+                <div className="rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-4 dark:border-darkroom-border dark:bg-darkroom-elevated">
+                  <span className="text-apple-gray-500">Dialogue Stem</span>
+                  <div className="text-sm font-bold text-apple-gray-900 dark:text-white mt-1">vocals.wav</div>
+                  <span className="text-emerald-600 text-[11px] font-semibold">Clean Isolation (SDR 12.4 dB)</span>
+                </div>
+                <div className="rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-4 dark:border-darkroom-border dark:bg-darkroom-elevated">
+                  <span className="text-apple-gray-500">Music & Effects (M&E)</span>
+                  <div className="text-sm font-bold text-apple-gray-900 dark:text-white mt-1">m_and_e.wav</div>
+                  <span className="text-cinema-green text-[11px] font-semibold">100% Phase Preserved</span>
+                </div>
+                <div className="rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-4 dark:border-darkroom-border dark:bg-darkroom-elevated">
+                  <span className="text-apple-gray-500">Integrated Loudness</span>
+                  <div className="text-sm font-bold text-apple-gray-900 dark:text-white mt-1">
+                    {loudnessCalibrated ? '-24.0 LKFS (Conformed)' : '-24.1 LKFS'}
+                  </div>
+                  <span className="text-emerald-600 text-[11px] font-semibold">Within ±0.5 dB Tolerance</span>
+                </div>
+              </div>
+
+              {/* Audio Supervisor Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-apple-gray-200/60 dark:border-darkroom-border/60">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-apple-gray-500">Sound Engineering Clearance:</span>
+                  {hasPermission('ADJUST_AUDIO_STEMS') ? (
+                    <span className="rounded-md bg-cinema-purple/15 px-2 py-0.5 text-[10px] font-bold text-cinema-purple border border-cinema-purple/30 dark:bg-purple-500/20 dark:text-purple-400">
+                      Sound Supervisor Authorized
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-apple-gray-200 dark:bg-darkroom-elevated px-2 py-0.5 text-[10px] font-medium text-apple-gray-500">
+                      Read-Only (Sound Supervisor or Director Role Required)
+                    </span>
+                  )}
+                </div>
+                {hasPermission('ADJUST_AUDIO_STEMS') && (
+                  <button
+                    onClick={() => setLoudnessCalibrated((prev) => !prev)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cinema-purple px-3.5 py-2 text-xs font-semibold text-white hover:bg-purple-700 active:scale-95 transition-all"
+                  >
+                    <Sliders className="h-3.5 w-3.5" />
+                    <span>{loudnessCalibrated ? 'Reset Loudness Trim' : 'Re-Calibrate LKFS Conformance'}</span>
+                  </button>
                 )}
               </div>
-              {hasPermission('ADJUST_AUDIO_STEMS') && (
-                <button
-                  onClick={() => setLoudnessCalibrated((prev) => !prev)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cinema-purple px-3.5 py-2 text-xs font-semibold text-white hover:bg-purple-700 active:scale-95 transition-all"
-                >
-                  <Sliders className="h-3.5 w-3.5" />
-                  <span>{loudnessCalibrated ? 'Reset Loudness Trim' : 'Re-Calibrate LKFS Conformance'}</span>
-                </button>
-              )}
             </div>
           </div>
         )}
