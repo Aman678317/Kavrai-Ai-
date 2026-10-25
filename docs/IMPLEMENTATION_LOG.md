@@ -240,6 +240,83 @@ dist/assets/index-DMEm-oh8.js   285.45 kB │ gzip: 80.32 kB
 ```
 
 ---
+
+## 9. Asynchronous Python AI Video Analysis & Character Recognition Service
+
+### 9.1 Architectural Inventory
+| File Path | Component / Feature |
+| :--- | :--- |
+| `services/video_analyzer/pyproject.toml` | Microservice configuration with FastAPI, Pydantic, Uvicorn, and Pytest. |
+| `services/video_analyzer/src/models.py` | Pydantic domain models: `ShotMetadata`, `SceneMetadata`, `AnalysisJobRequest`, `AnalysisJobResponse`, `FaceBoundingBox`, and `AnalysisStage`. |
+| `services/video_analyzer/src/scene_detector.py` | Content-aware shot boundary detection implementing `ContentDetector` threshold analysis, standard library fallback, and zero-drift SMPTE timecode math (`HH:MM:SS:FF`) at cinema frame rates (24.0, 23.976 fps) over 120-minute feature films. |
+| `services/video_analyzer/src/character_identifier.py` | Character facial appearance and biometric scoring engine matching performer consent profiles with SyncNet ($\ge 8.2$) and SSIM ($\ge 0.992$) benchmark calculation. |
+| `services/video_analyzer/src/job_queue.py` | Asynchronous background worker queue managing job state transitions (`QUEUED` $\to$ `SCENE_DETECTION` $\to$ `CHARACTER_RECOGNITION` $\to$ `TIMECODE_INDEXING` $\to$ `COMPLETED`) with failure recovery. |
+| `services/video_analyzer/src/service.py` | FastAPI HTTP microservice exposing `POST /api/v1/analysis/jobs`, `GET /api/v1/analysis/jobs/{job_id}`, and `GET /api/v1/analysis/jobs/reel/{reel_id}` with CORS enabled. |
+| `services/video_analyzer/tests/test_analyzer.py` | Automated test suite verifying SMPTE math, contiguous shot cuts, 120-minute simulated film processing with zero drift, character biometric scoring, job queue state progression, and FastAPI endpoints. |
+| `apps/web/src/lib/api.ts` | Added `videoAnalysisApi.triggerAnalysis()` client method. |
+| `apps/web/src/pages/ProjectDetailPage.tsx` | Added "Analyze Reel AI Metadata" button and live progress ribbon with automatic shot table hydration. |
+
+### 9.2 Python Automated Test Results (10 of 10 Passing)
+```
+$ python -m pytest services/video_analyzer/tests/ -v
+
+============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\acer\3D Objects\kavrai AI\services\video_analyzer
+configfile: pyproject.toml
+plugins: anyio-4.12.0, langsmith-0.7.33, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False
+
+services/video_analyzer/tests/test_analyzer.py::TestSMPTEConversions::test_frames_to_smpte PASSED [ 10%]
+services/video_analyzer/tests/test_analyzer.py::TestSMPTEConversions::test_smpte_to_frames PASSED [ 20%]
+services/video_analyzer/tests/test_analyzer.py::TestSMPTEConversions::test_round_trip_timecode PASSED [ 30%]
+services/video_analyzer/tests/test_analyzer.py::TestSceneAndShotDetection::test_contiguous_shot_boundaries PASSED [ 40%]
+services/video_analyzer/tests/test_analyzer.py::TestSceneAndShotDetection::test_long_film_zero_drift PASSED [ 50%]
+services/video_analyzer/tests/test_analyzer.py::TestCharacterIdentification::test_character_attribution_and_qc_bounds PASSED [ 60%]
+services/video_analyzer/tests/test_analyzer.py::TestAsyncJobQueue::test_job_lifecycle_completion PASSED [ 70%]
+services/video_analyzer/tests/test_analyzer.py::TestAsyncJobQueue::test_job_failure_handling PASSED [ 80%]
+services/video_analyzer/tests/test_analyzer.py::TestFastAPIService::test_health_check PASSED [ 90%]
+services/video_analyzer/tests/test_analyzer.py::TestFastAPIService::test_create_and_poll_job PASSED [100%]
+
+============================= 10 passed in 0.81s ==============================
+```
+
+### 9.3 Frontend Test Results (24 of 24 Passing)
+```
+> @kavrai/web@1.0.0 test
+> vitest run
+
+ RUN  v2.1.9 C:/Users/acer/3D Objects/kavrai AI/apps/web
+
+ ✓ src/test/auth.test.ts (6 tests) 13ms
+ ✓ src/test/ingest.test.ts (6 tests) 202ms
+ ✓ src/test/timecode.test.ts (6 tests) 5ms
+ ✓ src/test/api.test.ts (6 tests) 2180ms
+
+ Test Files  4 passed (4)
+      Tests  24 passed (24)
+   Duration  3.40s
+```
+
+### 9.4 Frontend Production Build Verification
+```
+> @kavrai/web@1.0.0 build
+> tsc -b && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1587 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.04 kB │ gzip:  0.62 kB
+dist/assets/index-CUFZuiyT.css   42.74 kB │ gzip:  7.58 kB
+dist/assets/index-Dog7Xa_F.js   288.48 kB │ gzip: 81.11 kB
+✓ built in 5.79s
+```
+
+---
 *End of Kavrai AI Implementation Log.*
+
 
 

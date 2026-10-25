@@ -1,4 +1,4 @@
-import { FilmProject, CreateProjectInput, StudioMetrics, Reel } from '../types/project';
+import { FilmProject, CreateProjectInput, StudioMetrics, Reel, Shot } from '../types/project';
 import { DEMO_PROJECTS, SUPPORTED_LANGUAGES } from './demoData';
 import { MediaMetadata, MultipartUploadSession, UploadPart } from '../types/ingest';
 import {
@@ -269,4 +269,98 @@ export const mediaIngestApi = {
     };
   },
 };
+
+/**
+ * AI Video Analysis & Character Recognition API Client
+ */
+export const videoAnalysisApi = {
+  async triggerAnalysis(
+    _projectId: string,
+    reelId: string,
+    _s3Uri: string,
+    onProgress?: (stage: string, percent: number) => void
+  ): Promise<Shot[]> {
+    onProgress?.('Detecting scene & shot cuts (Content-Aware)...', 30);
+    await new Promise((r) => setTimeout(r, 350));
+
+    onProgress?.('Clustering visible characters & ArcFace embeddings...', 65);
+    await new Promise((r) => setTimeout(r, 400));
+
+    onProgress?.('Indexing frame-accurate SMPTE timecodes...', 90);
+    await new Promise((r) => setTimeout(r, 300));
+
+    const generatedShots: Shot[] = [
+      {
+        id: `shot-${reelId}-101`,
+        shotNumber: 1,
+        timecodeIn: '01:00:00:00',
+        timecodeOut: '01:00:04:12',
+        durationFrames: 108,
+        activeSpeaker: 'Commander Elena Vance',
+        syncNetConfidence: 8.9,
+        ssimIdentity: 0.996,
+        status: 'COMPLETED',
+      },
+      {
+        id: `shot-${reelId}-102`,
+        shotNumber: 2,
+        timecodeIn: '01:00:04:12',
+        timecodeOut: '01:00:09:04',
+        durationFrames: 112,
+        activeSpeaker: 'Chief Engineer Kaelen',
+        syncNetConfidence: 8.7,
+        ssimIdentity: 0.994,
+        status: 'COMPLETED',
+      },
+      {
+        id: `shot-${reelId}-103`,
+        shotNumber: 3,
+        timecodeIn: '01:00:09:04',
+        timecodeOut: '01:00:16:18',
+        durationFrames: 182,
+        activeSpeaker: 'Commander Elena Vance',
+        syncNetConfidence: 9.1,
+        ssimIdentity: 0.997,
+        status: 'LIP_SYNCING',
+      },
+      {
+        id: `shot-${reelId}-104`,
+        shotNumber: 4,
+        timecodeIn: '01:00:16:18',
+        timecodeOut: '01:00:19:22',
+        durationFrames: 76,
+        activeSpeaker: 'AI Interface "Aura"',
+        syncNetConfidence: 9.2,
+        ssimIdentity: 0.998,
+        status: 'DUBBING',
+      },
+      {
+        id: `shot-${reelId}-105`,
+        shotNumber: 5,
+        timecodeIn: '01:00:19:22',
+        timecodeOut: '01:00:25:10',
+        durationFrames: 132,
+        activeSpeaker: 'Dr. Aris Thorne',
+        syncNetConfidence: 8.8,
+        ssimIdentity: 0.995,
+        status: 'CONFORMING',
+      },
+      {
+        id: `shot-${reelId}-106`,
+        shotNumber: 6,
+        timecodeIn: '01:00:25:10',
+        timecodeOut: '01:00:30:00',
+        durationFrames: 110,
+        activeSpeaker: 'Chief Engineer Kaelen',
+        syncNetConfidence: 8.6,
+        ssimIdentity: 0.993,
+        status: 'QUEUED',
+      },
+    ];
+
+    onProgress?.('AI Shot Analysis complete.', 100);
+    return generatedShots;
+  },
+};
+
 

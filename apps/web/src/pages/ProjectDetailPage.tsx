@@ -13,9 +13,10 @@ import {
   Sliders,
   UserCheck,
   UploadCloud,
+  Sparkles,
 } from 'lucide-react';
 import { FilmProject, Reel, Shot } from '../types/project';
-import { projectsApi } from '../lib/api';
+import { projectsApi, videoAnalysisApi } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { CinemaPlayerModal } from '../components/player/CinemaPlayerModal';
 import { MediaIngestModal } from '../components/ingest/MediaIngestModal';
@@ -77,6 +78,10 @@ export const ProjectDetailPage: React.FC = () => {
   const [isIngestOpen, setIsIngestOpen] = useState<boolean>(false);
   const [c2paSigned, setC2paSigned] = useState<boolean>(false);
   const [loudnessCalibrated, setLoudnessCalibrated] = useState<boolean>(false);
+  const [shots, setShots] = useState<Shot[]>(MOCK_SHOTS);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [analysisStage, setAnalysisStage] = useState<string>('');
+  const [analysisProgress, setAnalysisProgress] = useState<number>(0);
   const { user, hasPermission } = useAuth();
 
   useEffect(() => {
@@ -330,7 +335,7 @@ export const ProjectDetailPage: React.FC = () => {
 
             {/* Shots Table */}
             <div className="overflow-hidden rounded-2xl border border-apple-gray-200 bg-apple-surface shadow-apple-sm dark:border-darkroom-border dark:bg-darkroom-surface">
-              <div className="border-b border-apple-gray-100 bg-apple-gray-50/50 px-5 py-3 dark:border-darkroom-border dark:bg-darkroom-elevated/50 flex items-center justify-between">
+              <div className="border-b border-apple-gray-100 bg-apple-gray-50/50 px-5 py-3 dark:border-darkroom-border dark:bg-darkroom-elevated/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-apple-gray-700 dark:text-apple-gray-300">
                     Shot-by-Shot Timeline Conformance · {selectedReel?.name}
@@ -339,10 +344,56 @@ export const ProjectDetailPage: React.FC = () => {
                     Synchronized timecodes, active speaker attribution, and SyncNet verification
                   </p>
                 </div>
-                <span className="rounded-full bg-cinema-green/10 text-cinema-green px-2.5 py-0.5 text-[11px] font-semibold border border-cinema-green/20">
-                  SyncNet Benchmark: $\ge 8.2$
-                </span>
+                <div className="flex items-center gap-2.5">
+                  <span className="rounded-full bg-cinema-green/10 text-cinema-green px-2.5 py-0.5 text-[11px] font-semibold border border-cinema-green/20">
+                    SyncNet Target: &ge; 8.2
+                  </span>
+                  <button
+                    onClick={async () => {
+                      if (!selectedReel || !project) return;
+                      setIsAnalyzing(true);
+                      try {
+                        const detected = await videoAnalysisApi.triggerAnalysis(
+                          project.id,
+                          selectedReel.id,
+                          selectedReel.s3MasterUri || 's3://cinema-vault-raw/reel_01.mov',
+                          (stg, pct) => {
+                            setAnalysisStage(stg);
+                            setAnalysisProgress(pct);
+                          }
+                        );
+                        setShots(detected);
+                      } finally {
+                        setIsAnalyzing(false);
+                      }
+                    }}
+                    disabled={isAnalyzing}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-apple-blue px-3 py-1.5 text-xs font-semibold text-white shadow-glow-blue hover:bg-apple-blue-hover active:scale-95 disabled:opacity-50 transition-all"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>{isAnalyzing ? 'Analyzing AI Cuts...' : 'Analyze Reel AI Metadata'}</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Live AI Analysis Progress Ribbon */}
+              {isAnalyzing && (
+                <div className="p-4 bg-apple-blue/5 border-b border-apple-blue/15 dark:bg-apple-blue/10 animate-fade-in">
+                  <div className="flex items-center justify-between text-xs font-semibold text-apple-blue dark:text-blue-400 mb-1.5">
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-apple-blue animate-pulse" />
+                      <span>{analysisStage}</span>
+                    </span>
+                    <span className="font-mono">{analysisProgress}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-apple-blue/20 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-apple-blue rounded-full transition-all duration-300"
+                      style={{ width: `${analysisProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
@@ -357,7 +408,7 @@ export const ProjectDetailPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-apple-gray-100 dark:divide-darkroom-border/60">
-                    {MOCK_SHOTS.map((shot) => (
+                    {shots.map((shot) => (
                       <tr key={shot.id} className="hover:bg-apple-gray-50/50 dark:hover:bg-darkroom-elevated/50 transition-colors">
                         <td className="px-5 py-3.5 font-mono font-medium text-apple-gray-900 dark:text-white">
                           #{shot.shotNumber.toString().padStart(3, '0')}
